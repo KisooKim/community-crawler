@@ -62,7 +62,7 @@ class CrawlerService:
         """사이트 정보 조회 또는 생성"""
         site = self.db.execute(
             select(Site).where(Site.name == crawler.site_name)
-        ).scalar_one_or_none()
+        ).scalars().first()
 
         if not site:
             site = Site(

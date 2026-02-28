@@ -64,7 +64,7 @@ class TrendService:
                 TrendArticle.trend_id == trend.id,
                 TrendArticle.url == article_data["url"],
             )
-        ).scalar_one_or_none()
+        ).scalars().first()
 
         if existing:
             return existing
@@ -94,7 +94,7 @@ class TrendService:
                 TrendImage.trend_id == trend.id,
                 TrendImage.url == image_data["url"],
             )
-        ).scalar_one_or_none()
+        ).scalars().first()
 
         if existing:
             if not existing.storage_key and image_data.get("storage_key"):
