@@ -14,7 +14,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install scrapling
-        run: pip install "scrapling[all]" beautifulsoup4 lxml
+        run: |
+          pip install "scrapling[all]" beautifulsoup4 lxml
+          patchright install chromium
 
       - name: Test fmkorea and arcalive with StealthyFetcher
         run: |
