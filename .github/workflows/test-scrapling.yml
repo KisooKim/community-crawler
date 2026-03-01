@@ -13,38 +13,61 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install scrapling
+      - name: Install dependencies
         run: |
-          pip install "scrapling[all]" beautifulsoup4 lxml
+          pip install "scrapling[all]" camoufox[geoip] beautifulsoup4 lxml
           patchright install chromium
+          python3 -c "import camoufox; camoufox.install()"
 
-      - name: Test fmkorea and arcalive with StealthyFetcher
+      - name: Test multiple fetcher approaches
         run: |
-          python3 -c "
-          from scrapling.fetchers import StealthyFetcher
+          python3 << 'PYEOF'
           from bs4 import BeautifulSoup
 
-          # fmkorea
-          print('--- fmkorea ---')
-          page = StealthyFetcher.fetch('https://www.fmkorea.com/best2', headless=True, network_idle=True)
-          print(f'status={page.status}')
-          soup = BeautifulSoup(page.body, 'lxml')
-          items = soup.select('li.li')
-          print(f'li.li items: {len(items)}')
-          for it in items[:3]:
-              link = it.select_one('h3.title a')
-              if link:
-                  print(f'  {link.get_text(strip=True)[:50]}')
+          urls = {
+              "fmkorea": "https://www.fmkorea.com/best2",
+              "arcalive": "https://arca.live/b/live",
+          }
 
-          # arcalive
-          print('--- arcalive ---')
-          page2 = StealthyFetcher.fetch('https://arca.live/b/live', headless=True, network_idle=True)
-          print(f'status={page2.status}')
-          soup2 = BeautifulSoup(page2.body, 'lxml')
-          rows = soup2.select('a.vrow.column')
-          print(f'a.vrow.column rows: {len(rows)}')
-          for r in rows[:3]:
-              title_el = r.select_one('.title')
-              if title_el:
-                  print(f'  {title_el.get_text(strip=True)[:50]}')
-          "
+          # 1) StealthyFetcher (patchright chromium)
+          print("=== StealthyFetcher ===")
+          from scrapling.fetchers import StealthyFetcher
+          for name, url in urls.items():
+              try:
+                  page = StealthyFetcher.fetch(url, headless=True, network_idle=True)
+                  soup = BeautifulSoup(page.body, "lxml")
+                  count = len(soup.select("li.li" if name == "fmkorea" else "a.vrow.column"))
+                  print(f"  {name}: status={page.status}, items={count}")
+              except Exception as e:
+                  print(f"  {name}: ERROR {e}")
+
+          # 2) StealthyFetcher + solve_cloudflare (for arcalive)
+          print("=== StealthyFetcher + solve_cloudflare ===")
+          for name, url in urls.items():
+              try:
+                  page = StealthyFetcher.fetch(url, headless=True, network_idle=True, solve_cloudflare=True)
+                  soup = BeautifulSoup(page.body, "lxml")
+                  count = len(soup.select("li.li" if name == "fmkorea" else "a.vrow.column"))
+                  print(f"  {name}: status={page.status}, items={count}")
+              except Exception as e:
+                  print(f"  {name}: ERROR {e}")
+
+          # 3) Camoufox direct (Firefox-based stealth)
+          print("=== Camoufox direct ===")
+          from camoufox.sync_api import Camoufox
+          with Camoufox(headless=True) as browser:
+              page = browser.new_page()
+              for name, url in urls.items():
+                  try:
+                      page.goto(url, wait_until="networkidle", timeout=30000)
+                      html = page.content()
+                      soup = BeautifulSoup(html, "lxml")
+                      count = len(soup.select("li.li" if name == "fmkorea" else "a.vrow.column"))
+                      print(f"  {name}: items={count}")
+                      if count > 0:
+                          sel = "h3.title a" if name == "fmkorea" else ".title"
+                          for el in soup.select(sel)[:3]:
+                              print(f"    {el.get_text(strip=True)[:50]}")
+                  except Exception as e:
+                      print(f"  {name}: ERROR {e}")
+          PYEOF
