@@ -20,6 +20,8 @@ from crawlers.slrclub import SlrclubCrawler
 from crawlers.cook82 import Cook82Crawler
 from crawlers.orbi import OrbiCrawler
 from crawlers.coinpan import CoinpanCrawler
+from crawlers.fmkorea import FmKoreaCrawler
+from crawlers.arcalive import ArcaliveCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,8 @@ class CrawlerService:
         "cook82": Cook82Crawler,
         "orbi": OrbiCrawler,
         "coinpan": CoinpanCrawler,
+        "fmkorea": FmKoreaCrawler,
+        "arcalive": ArcaliveCrawler,
     }
 
     def __init__(self, db: Session = None):

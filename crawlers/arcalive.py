@@ -4,13 +4,7 @@ from crawlers.base import BaseCrawler, ArticleData
 
 
 class ArcaliveCrawler(BaseCrawler):
-    """아카라이브 크롤러 (Playwright 사용 - Cloudflare 우회)"""
-
-    def __init__(self):
-        super().__init__()
-        self._playwright = None
-        self._browser = None
-        self._page = None
+    """아카라이브 크롤러 (StealthyFetcher - Cloudflare 우회)"""
 
     @property
     def site_name(self) -> str:
@@ -24,33 +18,20 @@ class ArcaliveCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://arca.live"
 
-    def _ensure_browser(self):
-        if self._page:
-            return
-        from playwright.sync_api import sync_playwright
-
-        self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(headless=True)
-        self._page = self._browser.new_page()
-        self._page.set_extra_http_headers({
-            "Accept-Language": "ko-KR,ko;q=0.9",
-        })
-
-    def _fetch_page(self, url: str) -> BeautifulSoup:
-        self._ensure_browser()
-        self._page.goto(url, wait_until="networkidle", timeout=30000)
-        html = self._page.content()
-        return BeautifulSoup(html, "lxml")
-
     def get_popular_articles(self) -> list[ArticleData]:
         """베스트 라이브 수집"""
+        from scrapling.fetchers import StealthyFetcher
+
+        page = StealthyFetcher.fetch(
+            f"{self.base_url}/b/live",
+            headless=True,
+            network_idle=True,
+        )
+
+        soup = BeautifulSoup(page.body, "lxml")
         articles = []
-        url = f"{self.base_url}/b/live"
-        soup = self._fetch_page(url)
 
-        rows = soup.select("a.vrow.column")[:30]
-
-        for row in rows:
+        for row in soup.select("a.vrow.column")[:30]:
             try:
                 article = self._parse_row(row)
                 if article:
@@ -120,15 +101,3 @@ class ArcaliveCrawler(BaseCrawler):
             like_count=like_count,
             comment_count=comment_count,
         )
-
-    def close(self):
-        if self._page:
-            self._page.close()
-            self._page = None
-        if self._browser:
-            self._browser.close()
-            self._browser = None
-        if self._playwright:
-            self._playwright.stop()
-            self._playwright = None
-        super().close()
