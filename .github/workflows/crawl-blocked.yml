@@ -27,7 +27,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DEBUG: "false"
         run: |
-          python3 -c "
+          python -c "
           import app.models.trend
           from app.core.database import Base, sync_engine
           Base.metadata.create_all(sync_engine)
