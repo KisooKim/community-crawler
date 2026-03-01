@@ -6,9 +6,7 @@ from sqlalchemy import select
 from app.models.trend import Site, TrendArticle
 from app.services.trend_service import TrendService
 from app.services.image_service import ImageService
-from crawlers.fmkorea import FmKoreaCrawler
 from crawlers.clien import ClienCrawler
-from crawlers.ruliweb import RuliwebCrawler
 from crawlers.theqoo import TheqooCrawler
 from crawlers.ppomppu import PpomppuCrawler
 from crawlers.instiz import InstizCrawler
@@ -21,8 +19,6 @@ from crawlers.inven import InvenCrawler
 from crawlers.slrclub import SlrclubCrawler
 from crawlers.cook82 import Cook82Crawler
 from crawlers.orbi import OrbiCrawler
-from crawlers.coinpan import CoinpanCrawler
-from crawlers.arcalive import ArcaliveCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +30,6 @@ class CrawlerService:
         "clien": ClienCrawler,
         "theqoo": TheqooCrawler,
         "ppomppu": PpomppuCrawler,
-        "fmkorea": FmKoreaCrawler,
         "instiz": InstizCrawler,
         "todayhumor": TodayhumorCrawler,
         "natepann": NatepannCrawler,
@@ -45,8 +40,6 @@ class CrawlerService:
         "slrclub": SlrclubCrawler,
         "cook82": Cook82Crawler,
         "orbi": OrbiCrawler,
-        "coinpan": CoinpanCrawler,
-        "arcalive": ArcaliveCrawler,
     }
 
     def __init__(self, db: Session = None):

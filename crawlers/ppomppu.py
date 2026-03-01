@@ -39,53 +39,60 @@ class PpomppuCrawler(BaseCrawler):
         return articles
 
     def _parse_row(self, row) -> ArticleData | None:
-        title_a = row.select_one("a.baseList-title")
-        if not title_a:
+        title_td = row.select_one("td.title")
+        if not title_td:
             return None
 
-        title = title_a.get_text(strip=True)
-        href = title_a.get("href", "")
+        # a.baseList-title 태그가 2개: 첫 번째는 빈 태그, 두 번째에 실제 제목
+        title_links = title_td.select("a.baseList-title")
+        title = ""
+        href = ""
+        for a in title_links:
+            text = a.get_text(strip=True)
+            if text:
+                title = text
+                href = a.get("href", "")
+                break
+
+        if not title or not href:
+            return None
+
+        # href가 /zboard/... 형태이므로 base_url에 바로 붙임
         if not href.startswith("http"):
-            href = f"{self.base_url}/zboard/{href}"
+            href = self.base_url + href
 
         view_count = 0
-        views_td = row.select_one("td.baseList-views")
-        if views_td:
-            numbers = re.findall(r"\d+", views_td.get_text(strip=True).replace(",", ""))
-            if numbers:
-                view_count = int(numbers[0])
+        # 조회수: 마지막 td.board_date
+        date_tds = row.select("td.board_date")
+        if len(date_tds) >= 3:
+            nums = re.findall(r"\d+", date_tds[-1].get_text(strip=True).replace(",", ""))
+            if nums:
+                view_count = int(nums[0])
 
-        image_urls = self._get_article_images(href)
+        # 리스트 썸네일 사용 (본문에 이미지가 없는 경우가 많음)
+        image_urls = []
+        thumb = title_td.select_one("a.baseList-thumb img")
+        if thumb:
+            src = thumb.get("src", "")
+            if src and "noimage" not in src:
+                if src.startswith("//"):
+                    src = "https:" + src
+                elif not src.startswith("http"):
+                    src = self.base_url + src
+                image_urls.append(src)
+
+        # 댓글 수
+        comment_count = 0
+        comment_el = title_td.select_one("span.list_comment2")
+        if comment_el:
+            nums = re.findall(r"\d+", comment_el.get_text())
+            if nums:
+                comment_count = int(nums[0])
 
         return ArticleData(
             title=title,
             url=href,
             image_urls=image_urls,
             view_count=view_count,
+            comment_count=comment_count,
         )
-
-    def _get_article_images(self, url: str) -> list[str]:
-        try:
-            soup = self.fetch_html(url)
-            images = []
-            content = soup.select_one("td.board-contents")
-            if not content:
-                return []
-
-            for img in content.select("img"):
-                src = img.get("src") or img.get("data-src")
-                if src and self._is_valid_image(src):
-                    if src.startswith("//"):
-                        src = "https:" + src
-                    elif not src.startswith("http"):
-                        src = self.base_url + "/" + src.lstrip("/")
-                    images.append(src)
-
-            return images[:10]
-        except Exception:
-            return []
-
-    def _is_valid_image(self, url: str) -> bool:
-        exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank"]
-        url_lower = url.lower()
-        return not any(p in url_lower for p in exclude)
