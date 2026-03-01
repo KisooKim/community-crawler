@@ -1,0 +1,39 @@
+name: Test Scrapling
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scrapling
+        run: pip install "scrapling[all]"
+
+      - name: Test blocked sites
+        run: |
+          python3 -c "
+          from scrapling.fetchers import Fetcher
+          f = Fetcher()
+
+          # fmkorea
+          page = f.get('https://www.fmkorea.com/best2', stealthy_headers=True)
+          items = page.css('li.li')
+          print(f'fmkorea: status={page.status}, items={len(items)}')
+
+          # coinpan
+          page2 = f.get('https://coinpan.com/index.php?mid=free&sort_index=voted_count&order_type=desc&page=1', stealthy_headers=True)
+          rows = page2.css('#board_list table tr')
+          print(f'coinpan: status={page2.status}, rows={len(rows)}')
+
+          # arcalive
+          page3 = f.get('https://arca.live/b/live', stealthy_headers=True)
+          divs = page3.css('div.vrow')
+          print(f'arcalive: status={page3.status}, divs={len(divs)}')
+          "
