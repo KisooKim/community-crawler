@@ -6,7 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
       - uses: actions/setup-python@v5
@@ -14,26 +14,35 @@ jobs:
           python-version: "3.12"
 
       - name: Install scrapling
-        run: pip install "scrapling[all]"
+        run: pip install "scrapling[all]" beautifulsoup4 lxml
 
-      - name: Test blocked sites
+      - name: Test fmkorea and arcalive with StealthyFetcher
         run: |
           python3 -c "
-          from scrapling.fetchers import Fetcher
-          f = Fetcher()
+          from scrapling.fetchers import StealthyFetcher
+          from bs4 import BeautifulSoup
 
           # fmkorea
-          page = f.get('https://www.fmkorea.com/best2', stealthy_headers=True)
-          items = page.css('li.li')
-          print(f'fmkorea: status={page.status}, items={len(items)}')
-
-          # coinpan
-          page2 = f.get('https://coinpan.com/index.php?mid=free&sort_index=voted_count&order_type=desc&page=1', stealthy_headers=True)
-          rows = page2.css('#board_list table tr')
-          print(f'coinpan: status={page2.status}, rows={len(rows)}')
+          print('--- fmkorea ---')
+          page = StealthyFetcher.fetch('https://www.fmkorea.com/best2', headless=True, network_idle=True)
+          print(f'status={page.status}')
+          soup = BeautifulSoup(page.body, 'lxml')
+          items = soup.select('li.li')
+          print(f'li.li items: {len(items)}')
+          for it in items[:3]:
+              link = it.select_one('h3.title a')
+              if link:
+                  print(f'  {link.get_text(strip=True)[:50]}')
 
           # arcalive
-          page3 = f.get('https://arca.live/b/live', stealthy_headers=True)
-          divs = page3.css('div.vrow')
-          print(f'arcalive: status={page3.status}, divs={len(divs)}')
+          print('--- arcalive ---')
+          page2 = StealthyFetcher.fetch('https://arca.live/b/live', headless=True, network_idle=True)
+          print(f'status={page2.status}')
+          soup2 = BeautifulSoup(page2.body, 'lxml')
+          rows = soup2.select('a.vrow.column')
+          print(f'a.vrow.column rows: {len(rows)}')
+          for r in rows[:3]:
+              title_el = r.select_one('.title')
+              if title_el:
+                  print(f'  {title_el.get_text(strip=True)[:50]}')
           "
