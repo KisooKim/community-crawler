@@ -61,20 +61,25 @@ class InstizCrawler(BaseCrawler):
             if nums:
                 comment_count = int(nums[0])
 
-        # 썸네일
-        image_urls = []
+        # 썸네일로 이미지 유무 판단
         thumb_img = link.select_one("div.thumb img")
-        if thumb_img:
+        if not thumb_img:
+            return None  # 이미지 없는 글 스킵
+
+        # 상세 페이지에서 본문 이미지 추출
+        image_urls = self._get_article_images(href)
+        if not image_urls:
+            # 상세 페이지 실패 시 썸네일 폴백
             src = thumb_img.get("data-original") or thumb_img.get("src") or ""
             if src and self._is_valid_image(src):
                 if src.startswith("//"):
                     src = "https:" + src
                 elif not src.startswith("http"):
                     src = self.base_url + src
-                image_urls.append(src)
+                image_urls = [src]
 
         if not image_urls:
-            return None  # 이미지 없는 글 스킵
+            return None
 
         return ArticleData(
             title=title,
@@ -85,7 +90,30 @@ class InstizCrawler(BaseCrawler):
             comment_count=comment_count,
         )
 
+    def _get_article_images(self, url: str) -> list[str]:
+        """상세 페이지에서 본문 이미지 추출"""
+        try:
+            soup = self.fetch_html(url)
+            content = soup.select_one("div.memo_content")
+            if not content:
+                return []
+
+            images = []
+            for img in content.select("img"):
+                src = img.get("src") or img.get("data-src")
+                if src and self._is_valid_image(src):
+                    if src.startswith("//"):
+                        src = "https:" + src
+                    elif not src.startswith("http"):
+                        src = self.base_url + src
+                    images.append(src)
+
+            return images[:10]
+        except Exception:
+            return []
+
     def _is_valid_image(self, url: str) -> bool:
-        exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank.gif", "noimg"]
+        exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_",
+                    "blank.gif", "noimg", "/images/ico"]
         url_lower = url.lower()
         return not any(p in url_lower for p in exclude)
