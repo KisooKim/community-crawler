@@ -15,9 +15,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install "scrapling[all]" camoufox[geoip] beautifulsoup4 lxml
+          pip install "scrapling[all]" "camoufox[geoip]" beautifulsoup4 lxml
           patchright install chromium
-          python3 -c "import camoufox; camoufox.install()"
+          python3 -m camoufox fetch
 
       - name: Test multiple fetcher approaches
         run: |
