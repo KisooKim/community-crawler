@@ -62,24 +62,18 @@ class PpomppuCrawler(BaseCrawler):
             href = self.base_url + href
 
         view_count = 0
-        # 조회수: 마지막 td.board_date
+        like_count = 0
+        # td.board_date: [0]=시간, [1]=추천-반대, [2]=조회수
         date_tds = row.select("td.board_date")
         if len(date_tds) >= 3:
             nums = re.findall(r"\d+", date_tds[-1].get_text(strip=True).replace(",", ""))
             if nums:
                 view_count = int(nums[0])
+            like_nums = re.findall(r"\d+", date_tds[1].get_text(strip=True))
+            if like_nums:
+                like_count = int(like_nums[0])
 
-        # 리스트 썸네일 사용 (본문에 이미지가 없는 경우가 많음)
-        image_urls = []
-        thumb = title_td.select_one("a.baseList-thumb img")
-        if thumb:
-            src = thumb.get("src", "")
-            if src and "noimage" not in src:
-                if src.startswith("//"):
-                    src = "https:" + src
-                elif not src.startswith("http"):
-                    src = self.base_url + src
-                image_urls.append(src)
+        image_urls = self._get_article_images(href)
 
         # 댓글 수
         comment_count = 0
@@ -94,5 +88,48 @@ class PpomppuCrawler(BaseCrawler):
             url=href,
             image_urls=image_urls,
             view_count=view_count,
+            like_count=like_count,
             comment_count=comment_count,
         )
+
+    def _get_article_images(self, url: str) -> list[str]:
+        """모바일 페이지에서 본문 이미지 추출 (데스크톱은 JS 렌더링 필요)"""
+        try:
+            # 데스크톱 URL → 모바일 URL 변환
+            # https://www.ppomppu.co.kr/zboard/zboard.php?id=freeboard&no=123
+            # → https://m.ppomppu.co.kr/new/bbs_view.php?id=freeboard&no=123
+            import re as _re
+            m = _re.search(r"[?&]id=([^&]+)", url)
+            n = _re.search(r"[?&]no=(\d+)", url)
+            if not m or not n:
+                return []
+            mobile_url = f"https://m.ppomppu.co.kr/new/bbs_view.php?id={m.group(1)}&no={n.group(1)}"
+
+            soup = self.fetch_html(mobile_url)
+            content = soup.select_one("div.bbs.view")
+            if not content:
+                return []
+
+            # 댓글/팝업 영역 제거
+            for el in content.select(".comment-area, .hot-comment-preview, .comment-list, .popup-body"):
+                el.decompose()
+
+            images = []
+            for img in content.select("img"):
+                src = img.get("src") or img.get("data-src")
+                if src and self._is_valid_image(src):
+                    if src.startswith("//"):
+                        src = "https:" + src
+                    elif not src.startswith("http"):
+                        src = "https://m.ppomppu.co.kr" + src
+                    images.append(src)
+
+            return images[:10]
+        except Exception:
+            return []
+
+    def _is_valid_image(self, url: str) -> bool:
+        exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_",
+                    "blank", "loading", "noimage", "/images/"]
+        url_lower = url.lower()
+        return not any(p in url_lower for p in exclude)
