@@ -23,6 +23,7 @@ jobs:
           pip install httpx beautifulsoup4 lxml
           pip install imagehash Pillow
           pip install psycopg2-binary asyncpg greenlet
+          pip install "scrapling[all]"
 
       - name: Run crawler
         env:

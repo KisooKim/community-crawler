@@ -1,9 +1,20 @@
 import re
-from crawlers.base import BaseCrawler, ArticleData
+import time
+import random
+import logging
+from crawlers.base import ArticleData
+
+logger = logging.getLogger(__name__)
 
 
-class CoinpanCrawler(BaseCrawler):
-    """코인판 크롤러"""
+class CoinpanCrawler:
+    """코인판 크롤러 (Scrapling - TLS fingerprint bypass)"""
+
+    MAX_PAGES = 3
+
+    def __init__(self):
+        from scrapling.fetchers import Fetcher
+        self.fetcher = Fetcher()
 
     @property
     def site_name(self) -> str:
@@ -20,16 +31,23 @@ class CoinpanCrawler(BaseCrawler):
     def get_popular_articles(self) -> list[ArticleData]:
         """자유게시판 추천순"""
         articles = []
-        for page in range(1, self.MAX_PAGES + 1):
-            url = f"{self.base_url}/index.php?mid=free&sort_index=voted_count&order_type=desc&page={page}"
-            soup = self.fetch_html(url, delay=(page > 1))
+        for page_num in range(1, self.MAX_PAGES + 1):
+            url = f"{self.base_url}/index.php?mid=free&sort_index=voted_count&order_type=desc&page={page_num}"
 
-            rows = soup.select("#board_list table tr")
-            rows = [r for r in rows if "notice" not in " ".join(r.get("class", []))]
-            if not rows:
+            if page_num > 1:
+                time.sleep(random.uniform(2.0, 5.0))
+
+            page = self.fetcher.get(url, stealthy_headers=True)
+            if page.status != 200:
+                logger.warning(f"[coinpan] page {page_num} status={page.status}")
                 break
 
-            for row in rows:
+            rows = page.css("#board_list table tr")
+            data_rows = [r for r in rows if "notice" not in r.attrib.get("class", "")]
+            if not data_rows:
+                break
+
+            for row in data_rows:
                 try:
                     article = self._parse_row(row)
                     if article:
@@ -40,40 +58,42 @@ class CoinpanCrawler(BaseCrawler):
         return articles
 
     def _parse_row(self, row) -> ArticleData | None:
-        title_td = row.select_one("td.title")
-        if not title_td:
+        title_cells = row.css("td.title")
+        if not title_cells:
             return None
+        title_td = title_cells[0]
 
-        title_link = title_td.select_one("a[href]")
-        if not title_link:
+        title_links = title_td.css("a[href]")
+        if not title_links:
             return None
+        title_link = title_links[0]
 
-        title = title_link.get_text(strip=True)
+        title = title_link.get_all_text(strip=True)
         if not title:
             return None
 
-        href = title_link.get("href", "")
+        href = title_link.attrib.get("href", "")
         if not href.startswith("http"):
             href = self.base_url + href
 
         view_count = 0
-        view_td = row.select_one("td.readed")
-        if view_td:
-            nums = re.findall(r"\d+", view_td.get_text(strip=True).replace(",", ""))
+        view_cells = row.css("td.readed")
+        if view_cells:
+            nums = re.findall(r"\d+", view_cells[0].get_all_text(strip=True).replace(",", ""))
             if nums:
                 view_count = int(nums[0])
 
         like_count = 0
-        vote_td = row.select_one("td.voted")
-        if vote_td:
-            nums = re.findall(r"\d+", vote_td.get_text(strip=True))
+        vote_cells = row.css("td.voted")
+        if vote_cells:
+            nums = re.findall(r"\d+", vote_cells[0].get_all_text(strip=True))
             if nums:
                 like_count = int(nums[0])
 
         comment_count = 0
-        comment_link = title_td.select_one("a[title='Replies'] span.number")
-        if comment_link:
-            nums = re.findall(r"\d+", comment_link.get_text())
+        comment_spans = title_td.css("a[title='Replies'] span.number")
+        if comment_spans:
+            nums = re.findall(r"\d+", comment_spans[0].get_all_text())
             if nums:
                 comment_count = int(nums[0])
 
@@ -90,14 +110,20 @@ class CoinpanCrawler(BaseCrawler):
 
     def _get_article_images(self, url: str) -> list[str]:
         try:
-            soup = self.fetch_html(url)
-            images = []
-            content = soup.select_one("div.read_body div.xe_content") or soup.select_one("div.read_body")
-            if not content:
+            time.sleep(random.uniform(1.0, 3.0))
+            page = self.fetcher.get(url, stealthy_headers=True)
+            if page.status != 200:
                 return []
 
-            for img in content.select("img"):
-                src = img.get("src")
+            content_els = page.css("div.read_body div.xe_content")
+            if not content_els:
+                content_els = page.css("div.read_body")
+            if not content_els:
+                return []
+
+            images = []
+            for img in content_els[0].css("img"):
+                src = img.attrib.get("src", "")
                 if src and self._is_valid_image(src):
                     if src.startswith("//"):
                         src = "https:" + src
@@ -113,3 +139,12 @@ class CoinpanCrawler(BaseCrawler):
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank", "loading"]
         url_lower = url.lower()
         return not any(p in url_lower for p in exclude)
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
