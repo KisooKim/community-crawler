@@ -1,10 +1,9 @@
 import re
-from bs4 import BeautifulSoup
 from crawlers.base import BaseCrawler, ArticleData
 
 
 class ArcaliveCrawler(BaseCrawler):
-    """아카라이브 크롤러 (StealthyFetcher - Cloudflare 우회)"""
+    """아카라이브 크롤러 (httpx, self-hosted runner 전용)"""
 
     @property
     def site_name(self) -> str:
@@ -20,16 +19,9 @@ class ArcaliveCrawler(BaseCrawler):
 
     def get_popular_articles(self) -> list[ArticleData]:
         """베스트 라이브 수집"""
-        from scrapling.fetchers import StealthyFetcher
-
-        page = StealthyFetcher.fetch(
-            f"{self.base_url}/b/live",
-            headless=True,
-            network_idle=True,
-        )
-
-        soup = BeautifulSoup(page.body, "lxml")
         articles = []
+        url = f"{self.base_url}/b/live"
+        soup = self.fetch_html(url, delay=False)
 
         for row in soup.select("a.vrow.column")[:30]:
             try:

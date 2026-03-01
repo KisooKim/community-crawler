@@ -127,10 +127,24 @@ class CrawlerService:
             "skipped": skipped,
         }
 
+    # 데이터센터 IP에서 차단되는 사이트 (self-hosted runner 전용)
+    BLOCKED_SITES = {"fmkorea", "arcalive"}
+
     @staticmethod
-    def crawl_all_parallel(max_workers: int = 5) -> list[dict]:
-        """모든 사이트 병렬 크롤링 (각 스레드가 독립 DB 세션 사용)"""
+    def crawl_all_parallel(max_workers: int = 5, only: list[str] | None = None, exclude: list[str] | None = None) -> list[dict]:
+        """사이트 병렬 크롤링 (각 스레드가 독립 DB 세션 사용)
+
+        Args:
+            only: 지정 시 해당 사이트만 크롤링
+            exclude: 지정 시 해당 사이트 제외
+        """
         from app.core.database import SyncSessionLocal
+
+        sites = set(CrawlerService.CRAWLERS.keys())
+        if only:
+            sites = sites & set(only)
+        if exclude:
+            sites = sites - set(exclude)
 
         def _crawl_one(site_name: str) -> dict:
             with SyncSessionLocal() as db:
@@ -141,7 +155,7 @@ class CrawlerService:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(_crawl_one, name): name
-                for name in CrawlerService.CRAWLERS
+                for name in sites
             }
             for future in as_completed(futures):
                 site_name = futures[future]

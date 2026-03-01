@@ -1,21 +1,17 @@
-name: Crawl Communities
+name: Crawl Blocked Sites
 
 on:
   schedule:
-    - cron: "0 */2 * * *" # 2시간마다
+    - cron: "30 */2 * * *" # 2시간마다 (메인 크롤링 30분 후)
   workflow_dispatch: # 수동 실행
 
 jobs:
   crawl:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: self-hosted
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
 
       - name: Install Python dependencies
         run: |
@@ -24,7 +20,7 @@ jobs:
           pip install imagehash Pillow
           pip install psycopg2-binary asyncpg greenlet
 
-      - name: Run crawler
+      - name: Run blocked-site crawlers
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -36,7 +32,7 @@ jobs:
           from app.core.database import Base, sync_engine
           Base.metadata.create_all(sync_engine)
           from app.services.crawler_service import CrawlerService
-          results = CrawlerService.crawl_all_parallel(exclude=list(CrawlerService.BLOCKED_SITES))
+          results = CrawlerService.crawl_all_parallel(only=list(CrawlerService.BLOCKED_SITES))
           for r in results:
               status = 'OK' if 'error' not in r else 'FAIL'
               name = r.get('site', 'unknown')

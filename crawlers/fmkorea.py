@@ -1,10 +1,9 @@
 import re
-from bs4 import BeautifulSoup
 from crawlers.base import BaseCrawler, ArticleData
 
 
 class FmKoreaCrawler(BaseCrawler):
-    """에펨코리아 크롤러 (StealthyFetcher - JS challenge 우회)"""
+    """에펨코리아 크롤러 (httpx, self-hosted runner 전용)"""
 
     @property
     def site_name(self) -> str:
@@ -20,24 +19,22 @@ class FmKoreaCrawler(BaseCrawler):
 
     def get_popular_articles(self) -> list[ArticleData]:
         """포텐 터짐 화제순"""
-        from scrapling.fetchers import StealthyFetcher
-
-        page = StealthyFetcher.fetch(
-            f"{self.base_url}/best2",
-            headless=True,
-            network_idle=True,
-        )
-
-        soup = BeautifulSoup(page.body, "lxml")
         articles = []
+        for page in range(1, self.MAX_PAGES + 1):
+            url = f"{self.base_url}/best2?page={page}"
+            soup = self.fetch_html(url, delay=(page > 1))
 
-        for item in soup.select("li.li")[:30]:
-            try:
-                article = self._parse_item(item)
-                if article:
-                    articles.append(article)
-            except Exception:
-                continue
+            items = soup.select("li.li")
+            if not items:
+                break
+
+            for item in items:
+                try:
+                    article = self._parse_item(item)
+                    if article:
+                        articles.append(article)
+                except Exception:
+                    continue
 
         return articles
 
