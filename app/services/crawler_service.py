@@ -17,9 +17,9 @@ from crawlers.dcinside import DcinsideCrawler
 from crawlers.mlbpark import MlbparkCrawler
 from crawlers.inven import InvenCrawler
 from crawlers.slrclub import SlrclubCrawler
-from crawlers.cook82 import Cook82Crawler
 from crawlers.orbi import OrbiCrawler
 from crawlers.coinpan import CoinpanCrawler
+from crawlers.cook82 import Cook82Crawler
 from crawlers.fmkorea import FmKoreaCrawler
 from crawlers.arcalive import ArcaliveCrawler
 
@@ -41,12 +41,15 @@ class CrawlerService:
         "mlbpark": MlbparkCrawler,
         "inven": InvenCrawler,
         "slrclub": SlrclubCrawler,
-        "cook82": Cook82Crawler,
         "orbi": OrbiCrawler,
         "coinpan": CoinpanCrawler,
+        "cook82": Cook82Crawler,
         "fmkorea": FmKoreaCrawler,
         "arcalive": ArcaliveCrawler,
     }
+
+    # 데이터센터 IP에서 차단되는 사이트 (self-hosted runner 전용)
+    BLOCKED_SITES = {"fmkorea", "arcalive"}
 
     def __init__(self, db: Session = None):
         self.db = db
@@ -61,7 +64,7 @@ class CrawlerService:
         """사이트 정보 조회 또는 생성"""
         site = self.db.execute(
             select(Site).where(Site.name == crawler.site_name)
-        ).scalars().first()
+        ).scalar_one_or_none()
 
         if not site:
             site = Site(
@@ -87,6 +90,15 @@ class CrawlerService:
             referer = crawler.base_url
             articles = crawler.get_popular_articles()
 
+            # URL 중복 제거 (같은 글이 여러 리스트 페이지에 등장하는 경우)
+            seen_urls = set()
+            unique_articles = []
+            for a in articles:
+                if a.url not in seen_urls:
+                    seen_urls.add(a.url)
+                    unique_articles.append(a)
+            articles = unique_articles
+
             # 0단계: 이미 DB에 있는 글 URL 필터링 (이미지 다운로드 절약)
             existing_urls = set(
                 row[0] for row in self.db.execute(
@@ -98,8 +110,8 @@ class CrawlerService:
             new_articles = [a for a in articles if a.url not in existing_urls]
             logger.info(f"[{site_name}] {len(articles)} found, {len(new_articles)} new, {len(existing_urls)} skipped (already in DB)")
 
-            # 1단계: 새 글만 이미지 다운로드 + pHash 병렬 처리
-            image_results = self._prefetch_images(new_articles, referer)
+            # 1단계: 새 글만 이미지+비디오 다운로드 + pHash 병렬 처리
+            image_results = self._prefetch_media(new_articles, referer)
 
             # 2단계: DB 저장
             processed = 0
@@ -126,9 +138,6 @@ class CrawlerService:
             "processed": processed,
             "skipped": skipped,
         }
-
-    # 데이터센터 IP에서 차단되는 사이트 (self-hosted runner 전용)
-    BLOCKED_SITES = {"fmkorea", "arcalive"}
 
     @staticmethod
     def crawl_all_parallel(max_workers: int = 5, only: list[str] | None = None, exclude: list[str] | None = None) -> list[dict]:
@@ -180,25 +189,33 @@ class CrawlerService:
             results.append(result)
         return results
 
-    def _prefetch_images(self, articles, referer: str | None = None) -> dict:
-        """모든 글의 이미지를 병렬 다운로드 + pHash 계산 + WebP 변환.
-        Returns: {article_url: [image_result_dict, ...]} 매핑
+    def _prefetch_media(self, articles, referer: str | None = None) -> dict:
+        """모든 글의 이미지+비디오를 병렬 다운로드.
+        Returns: {article_url: [result_dict, ...]} 매핑
         """
-        # (article_url, index, image_url) 튜플 리스트
+        # (article_url, index, url, media_type) 튜플 리스트
         tasks = []
         for article in articles:
             for i, img_url in enumerate(article.image_urls[:10]):
-                tasks.append((article.url, i, img_url))
+                tasks.append((article.url, i, img_url, "image"))
+            # 비디오는 이미지 뒤에 붙임
+            offset = len(article.image_urls[:10])
+            for j, vid_url in enumerate(article.video_urls[:5]):
+                tasks.append((article.url, offset + j, vid_url, "video"))
 
         if not tasks:
             return {}
 
-        results = {}  # {article_url: [result, ...]}
+        results = {}  # {article_url: [(index, result), ...]}
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {
-                executor.submit(self.image_service.process_image, img_url, referer): (art_url, i)
-                for art_url, i, img_url in tasks
-            }
+            futures = {}
+            for art_url, idx, url, media_type in tasks:
+                if media_type == "video":
+                    fut = executor.submit(self.image_service.process_video, url, referer)
+                else:
+                    fut = executor.submit(self.image_service.process_image, url, referer)
+                futures[fut] = (art_url, idx)
+
             for future in as_completed(futures):
                 art_url, idx = futures[future]
                 try:
@@ -217,21 +234,26 @@ class CrawlerService:
         return results
 
     def _save_article(self, article_data, site: Site, image_results: list | None) -> bool:
-        """글 DB 저장 (이미지 결과가 이미 있는 상태)."""
+        """글 DB 저장 (이미지/비디오 결과가 이미 있는 상태)."""
         if not image_results:
             return False
 
-        # 첫 번째 이미지의 pHash로 트렌드 매칭
-        first = image_results[0]
-        if not first.get("phash"):
+        # 첫 번째 이미지(비디오 아닌)의 pHash로 트렌드 매칭
+        first_phash = None
+        for r in image_results:
+            if r.get("phash"):
+                first_phash = r["phash"]
+                break
+
+        if not first_phash:
             return False
 
         trend = self.trend_service.find_or_create_trend(
-            first["phash"],
+            first_phash,
             article_data.title,
         )
 
-        self.trend_service.add_article_to_trend(
+        article = self.trend_service.add_article_to_trend(
             trend,
             {
                 "title": article_data.title,
@@ -244,20 +266,46 @@ class CrawlerService:
             site.id,
         )
 
+        if article is None:
+            return False  # 같은 사이트 중복 → 스킵
+
         # 모든 이미지 캐싱 + DB 저장
         from datetime import datetime
         now = datetime.utcnow()
 
         for i, img_result in enumerate(image_results):
             storage_key = None
-            webp_data = img_result.get("webp_data")
-            if webp_data and self.supabase_url and self.supabase_service_role_key:
-                hash_prefix = (img_result.get("phash") or "nohash")[:8]
-                storage_key = f"{now.year}/{now.month:02d}/{now.day:02d}/{trend.id}_{i}_{hash_prefix}.webp"
-                if not self.image_service.upload_to_storage(
-                    webp_data, storage_key, self.supabase_url, self.supabase_service_role_key
-                ):
-                    storage_key = None
+            media_type = img_result.get("media_type", "image")
+            hash_prefix = (img_result.get("phash") or "nohash")[:8]
+
+            if media_type == "video" and img_result.get("raw_data"):
+                # 비디오 → 원본 MP4 업로드
+                if self.supabase_url and self.supabase_service_role_key:
+                    storage_key = f"{now.year}/{now.month:02d}/{now.day:02d}/{trend.id}_{i}_{hash_prefix}.mp4"
+                    if not self.image_service.upload_to_storage(
+                        img_result["raw_data"], storage_key,
+                        self.supabase_url, self.supabase_service_role_key,
+                        content_type="video/mp4",
+                    ):
+                        storage_key = None
+            elif img_result.get("is_gif") and img_result.get("raw_data"):
+                # 애니메이션 GIF → 원본 그대로 업로드
+                if self.supabase_url and self.supabase_service_role_key:
+                    storage_key = f"{now.year}/{now.month:02d}/{now.day:02d}/{trend.id}_{i}_{hash_prefix}.gif"
+                    if not self.image_service.upload_to_storage(
+                        img_result["raw_data"], storage_key,
+                        self.supabase_url, self.supabase_service_role_key,
+                        content_type="image/gif",
+                    ):
+                        storage_key = None
+            else:
+                webp_data = img_result.get("webp_data")
+                if webp_data and self.supabase_url and self.supabase_service_role_key:
+                    storage_key = f"{now.year}/{now.month:02d}/{now.day:02d}/{trend.id}_{i}_{hash_prefix}.webp"
+                    if not self.image_service.upload_to_storage(
+                        webp_data, storage_key, self.supabase_url, self.supabase_service_role_key
+                    ):
+                        storage_key = None
 
             self.trend_service.add_image_to_trend(trend, {
                 "url": img_result["url"],
@@ -265,6 +313,7 @@ class CrawlerService:
                 "width": img_result.get("width"),
                 "height": img_result.get("height"),
                 "storage_key": storage_key,
+                "media_type": media_type,
             })
 
         self.db.flush()

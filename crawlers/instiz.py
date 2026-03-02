@@ -66,8 +66,8 @@ class InstizCrawler(BaseCrawler):
         if not thumb_img:
             return None  # 이미지 없는 글 스킵
 
-        # 상세 페이지에서 본문 이미지 추출
-        image_urls = self._get_article_images(href)
+        # 상세 페이지에서 본문 이미지 + 비디오 추출
+        image_urls, video_urls = self._get_article_images(href)
         if not image_urls:
             # 상세 페이지 실패 시 썸네일 폴백
             src = thumb_img.get("data-original") or thumb_img.get("src") or ""
@@ -85,18 +85,19 @@ class InstizCrawler(BaseCrawler):
             title=title,
             url=href,
             image_urls=image_urls,
+            video_urls=video_urls,
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
-        """상세 페이지에서 본문 이미지 추출"""
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
+        """상세 페이지에서 본문 이미지 + 비디오 추출"""
         try:
             soup = self.fetch_html(url)
             content = soup.select_one("div.memo_content")
             if not content:
-                return []
+                return [], []
 
             images = []
             for img in content.select("img"):
@@ -108,9 +109,10 @@ class InstizCrawler(BaseCrawler):
                         src = self.base_url + src
                     images.append(src)
 
-            return images[:10]
+            videos = self._extract_videos(content)
+            return images[:10], videos
         except Exception:
-            return []
+            return [], []
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_",

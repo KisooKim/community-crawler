@@ -97,32 +97,34 @@ class CoinpanCrawler:
             if nums:
                 comment_count = int(nums[0])
 
-        image_urls = self._get_article_images(href)
+        image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
             title=title,
             url=href,
             image_urls=image_urls,
+            video_urls=video_urls,
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
         try:
             time.sleep(random.uniform(1.0, 3.0))
             page = self.fetcher.get(url, stealthy_headers=True)
             if page.status != 200:
-                return []
+                return [], []
 
             content_els = page.css("div.read_body div.xe_content")
             if not content_els:
                 content_els = page.css("div.read_body")
             if not content_els:
-                return []
+                return [], []
 
+            content = content_els[0]
             images = []
-            for img in content_els[0].css("img"):
+            for img in content.css("img"):
                 src = img.attrib.get("src", "")
                 if src and self._is_valid_image(src):
                     if src.startswith("//"):
@@ -131,9 +133,24 @@ class CoinpanCrawler:
                         src = self.base_url + src
                     images.append(src)
 
-            return images[:10]
+            # 비디오 추출 (Scrapling API)
+            videos = []
+            for video in content.css("video"):
+                src = video.attrib.get("src", "")
+                if not src:
+                    sources = video.css("source")
+                    if sources:
+                        src = sources[0].attrib.get("src", "")
+                if src:
+                    if src.startswith("//"):
+                        src = "https:" + src
+                    elif not src.startswith("http"):
+                        src = self.base_url + src
+                    videos.append(src)
+
+            return images[:10], videos[:5]
         except Exception:
-            return []
+            return [], []
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank", "loading"]

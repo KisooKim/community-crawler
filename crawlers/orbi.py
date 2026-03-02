@@ -68,36 +68,49 @@ class OrbiCrawler(BaseCrawler):
             if nums:
                 comment_count = int(nums[0])
 
-        image_urls = self._get_article_images(href)
+        images, video_urls, view_count = self._get_article_detail(href)
 
         return ArticleData(
             title=title,
             url=href,
-            image_urls=image_urls,
+            image_urls=images,
+            video_urls=video_urls,
+            view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
+    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int]:
+        """상세 페이지에서 이미지 + 비디오 + 조회수 추출"""
         try:
             soup = self.fetch_html(url)
+
+            # 조회수: <dt>조회수 42</dt>
+            view_count = 0
+            for dt in soup.select("dt"):
+                text = dt.get_text(strip=True)
+                if text.startswith("조회수"):
+                    nums = re.findall(r"\d+", text.replace(",", ""))
+                    if nums:
+                        view_count = int(nums[0])
+                    break
+
             images = []
             content = soup.select_one("div.content-wrap")
-            if not content:
-                return []
+            if content:
+                for img in content.select("img"):
+                    src = img.get("src") or img.get("data-src")
+                    if src and self._is_valid_image(src):
+                        if src.startswith("//"):
+                            src = "https:" + src
+                        elif not src.startswith("http"):
+                            src = self.base_url + src
+                        images.append(src)
 
-            for img in content.select("img"):
-                src = img.get("src") or img.get("data-src")
-                if src and self._is_valid_image(src):
-                    if src.startswith("//"):
-                        src = "https:" + src
-                    elif not src.startswith("http"):
-                        src = self.base_url + src
-                    images.append(src)
-
-            return images[:10]
+            videos = self._extract_videos(content) if content else []
+            return images[:10], videos, view_count
         except Exception:
-            return []
+            return [], [], 0
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank",

@@ -55,6 +55,9 @@ class TheqooCrawler(BaseCrawler):
         if not href.startswith("http"):
             href = self.base_url + href
 
+        # Strip list pagination param — same article gets different page= per list page
+        href = href.split("?")[0]
+
         view_count = 0
         views_td = row.select_one("td.m_no")
         if views_td:
@@ -69,34 +72,37 @@ class TheqooCrawler(BaseCrawler):
             if numbers:
                 comment_count = int(numbers[0])
 
-        image_urls = self._get_article_images(href)
+        images, video_urls, like_count = self._get_article_detail(href)
 
         return ArticleData(
             title=title,
             url=href,
-            image_urls=image_urls,
+            image_urls=images,
+            video_urls=video_urls,
             view_count=view_count,
+            like_count=like_count,
             comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
+    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int]:
+        """상세 페이지에서 이미지 + 비디오 추출 (더쿠는 추천수 미노출)"""
         try:
             soup = self.fetch_html(url)
+
             images = []
             content = soup.select_one(".xe_content")
-            if not content:
-                return []
+            if content:
+                for img in content.select("img"):
+                    src = img.get("src") or img.get("data-src")
+                    if src and self._is_valid_image(src):
+                        if src.startswith("//"):
+                            src = "https:" + src
+                        images.append(src)
 
-            for img in content.select("img"):
-                src = img.get("src") or img.get("data-src")
-                if src and self._is_valid_image(src):
-                    if src.startswith("//"):
-                        src = "https:" + src
-                    images.append(src)
-
-            return images[:10]
+            videos = self._extract_videos(content) if content else []
+            return images[:10], videos, 0
         except Exception:
-            return []
+            return [], [], 0
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_"]

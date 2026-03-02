@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from crawlers.base import BaseCrawler, ArticleData
 
 
@@ -60,6 +61,12 @@ class DcinsideCrawler(BaseCrawler):
         if not href.startswith("http"):
             href = self.base_url + href
 
+        # Strip list pagination param — same article gets different page= per list page
+        parsed = urlparse(href)
+        params = parse_qs(parsed.query, keep_blank_values=True)
+        params.pop("page", None)
+        href = urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
+
         view_count = 0
         count_td = row.select_one("td.gall_count")
         if count_td:
@@ -81,24 +88,25 @@ class DcinsideCrawler(BaseCrawler):
             if nums:
                 comment_count = int(nums[0])
 
-        image_urls = self._get_article_images(href)
+        image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
             title=title,
             url=href,
             image_urls=image_urls,
+            video_urls=video_urls,
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
         try:
             soup = self.fetch_html(url)
             images = []
             content = soup.select_one("div.write_div")
             if not content:
-                return []
+                return [], []
 
             for img in content.select("img"):
                 # Handle lazy loading: data-original takes priority
@@ -108,9 +116,10 @@ class DcinsideCrawler(BaseCrawler):
                         src = "https:" + src
                     images.append(src)
 
-            return images[:10]
+            videos = self._extract_videos(content)
+            return images[:10], videos
         except Exception:
-            return []
+            return [], []
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = [

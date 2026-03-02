@@ -76,24 +76,25 @@ class SlrclubCrawler(BaseCrawler):
         if comment_match:
             comment_count = int(comment_match.group(1))
 
-        image_urls = self._get_article_images(href)
+        image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
             title=title,
             url=href,
             image_urls=image_urls,
+            video_urls=video_urls,
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
         try:
             soup = self.fetch_html(url)
             images = []
             content = soup.select_one("div#userct")
             if not content:
-                return []
+                return [], []
 
             for img in content.select("img"):
                 src = img.get("src")
@@ -104,9 +105,10 @@ class SlrclubCrawler(BaseCrawler):
                         src = self.base_url + src
                     images.append(src)
 
-            return images[:10]
+            videos = self._extract_videos(content)
+            return images[:10], videos
         except Exception:
-            return []
+            return [], []
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank",

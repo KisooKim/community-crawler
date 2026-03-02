@@ -58,22 +58,35 @@ class ClienCrawler(BaseCrawler):
         if hit_el:
             view_count = self._parse_count(hit_el.get_text(strip=True))
 
-        image_urls = self._get_article_images(href)
+        like_count = 0
+        symph_el = item.select_one(".symph")
+        if symph_el:
+            like_count = self._parse_count(symph_el.get_text(strip=True))
+
+        comment_count = 0
+        reply_el = item.select_one(".rSymph05")
+        if reply_el:
+            comment_count = self._parse_count(reply_el.get_text(strip=True))
+
+        image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
             title=title,
             url=href,
             image_urls=image_urls,
+            video_urls=video_urls,
             view_count=view_count,
+            like_count=like_count,
+            comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
         try:
             soup = self.fetch_html(url)
             images = []
             content = soup.select_one(".post_article")
             if not content:
-                return []
+                return [], []
 
             for img in content.select("img"):
                 src = img.get("src") or img.get("data-src")
@@ -82,9 +95,10 @@ class ClienCrawler(BaseCrawler):
                         src = "https:" + src if src.startswith("//") else self.base_url + src
                     images.append(src)
 
-            return images[:10]
+            videos = self._extract_videos(content)
+            return images[:10], videos
         except Exception:
-            return []
+            return [], []
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank.gif"]

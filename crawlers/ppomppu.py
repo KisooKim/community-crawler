@@ -73,7 +73,7 @@ class PpomppuCrawler(BaseCrawler):
             if like_nums:
                 like_count = int(like_nums[0])
 
-        image_urls = self._get_article_images(href)
+        image_urls, video_urls = self._get_article_images(href)
 
         # 댓글 수
         comment_count = 0
@@ -87,28 +87,27 @@ class PpomppuCrawler(BaseCrawler):
             title=title,
             url=href,
             image_urls=image_urls,
+            video_urls=video_urls,
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
-        """모바일 페이지에서 본문 이미지 추출 (데스크톱은 JS 렌더링 필요)"""
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
+        """모바일 페이지에서 본문 이미지 + 비디오 추출 (데스크톱은 JS 렌더링 필요)"""
         try:
             # 데스크톱 URL → 모바일 URL 변환
-            # https://www.ppomppu.co.kr/zboard/zboard.php?id=freeboard&no=123
-            # → https://m.ppomppu.co.kr/new/bbs_view.php?id=freeboard&no=123
             import re as _re
             m = _re.search(r"[?&]id=([^&]+)", url)
             n = _re.search(r"[?&]no=(\d+)", url)
             if not m or not n:
-                return []
+                return [], []
             mobile_url = f"https://m.ppomppu.co.kr/new/bbs_view.php?id={m.group(1)}&no={n.group(1)}"
 
             soup = self.fetch_html(mobile_url)
             content = soup.select_one("div.bbs.view")
             if not content:
-                return []
+                return [], []
 
             # 댓글/팝업 영역 제거
             for el in content.select(".comment-area, .hot-comment-preview, .comment-list, .popup-body"):
@@ -124,9 +123,10 @@ class PpomppuCrawler(BaseCrawler):
                         src = "https://m.ppomppu.co.kr" + src
                     images.append(src)
 
-            return images[:10]
+            videos = self._extract_videos(content)
+            return images[:10], videos
         except Exception:
-            return []
+            return [], []
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_",

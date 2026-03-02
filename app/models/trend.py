@@ -48,6 +48,7 @@ class TrendImage(Base):
     url = Column(String(1000), nullable=False)  # 원본 이미지 URL
     storage_key = Column(String(500))  # Supabase Storage 경로
     phash = Column(String(64))  # pHash 값 (16진수 문자열)
+    media_type = Column(String(10), default="image")  # "image" or "video"
     width = Column(Integer)
     height = Column(Integer)
     order = Column(Integer, default=0)  # 트렌드 내 이미지 순서
@@ -83,4 +84,6 @@ class TrendArticle(Base):
     __table_args__ = (
         Index("idx_trend_articles_trend_id", "trend_id"),
         Index("idx_trend_articles_site_id", "site_id"),
+        # DB-level guard: one article per site per trend
+        Index("uq_trend_articles_trend_site", "trend_id", "site_id", unique=True),
     )

@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 import time
 import random
@@ -26,6 +26,7 @@ class ArticleData:
     title: str
     url: str
     image_urls: list[str]
+    video_urls: list[str] = field(default_factory=list)
     view_count: int = 0
     like_count: int = 0
     comment_count: int = 0
@@ -121,6 +122,31 @@ class BaseCrawler(ABC):
                     f"giving up after {self.MAX_RETRIES} retries"
                 )
                 response.raise_for_status()
+
+    def _extract_videos(self, content) -> list[str]:
+        """본문에서 <video> 태그의 MP4/WebM URL 추출"""
+        videos = []
+        if not content:
+            return videos
+        for video in content.select("video"):
+            src = video.get("src")
+            if src:
+                videos.append(src)
+                continue
+            source = video.select_one("source")
+            if source:
+                src = source.get("src")
+                if src:
+                    videos.append(src)
+        # URL 정규화
+        result = []
+        for src in videos:
+            if src.startswith("//"):
+                src = "https:" + src
+            elif not src.startswith("http"):
+                src = self.base_url + src
+            result.append(src)
+        return result[:5]
 
     def close(self):
         """리소스 정리"""

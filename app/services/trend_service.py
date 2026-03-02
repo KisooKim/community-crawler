@@ -1,7 +1,7 @@
 import math
 import re
 from datetime import datetime, timedelta
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
 
 from app.models.trend import Trend, TrendImage, TrendArticle
@@ -16,6 +16,7 @@ class TrendService:
     def __init__(self, db: Session = None):
         self.db = db
         self.image_service = ImageService()
+        self._site_stats_cache = None
 
     MATCH_WINDOW_HOURS = 72  # 최근 3일 이미지만 비교
 
@@ -57,17 +58,28 @@ class TrendService:
         trend: Trend,
         article_data: dict,
         site_id: int,
-    ) -> TrendArticle:
-        """트렌드에 원본 글 추가 (같은 URL이면 스킵)"""
+    ) -> TrendArticle | None:
+        """트렌드에 원본 글 추가 (같은 URL 또는 같은 사이트면 스킵)"""
         existing = self.db.execute(
             select(TrendArticle).where(
                 TrendArticle.trend_id == trend.id,
                 TrendArticle.url == article_data["url"],
             )
-        ).scalars().first()
+        ).scalar_one_or_none()
 
         if existing:
             return existing
+
+        # 같은 사이트에서 이미 글이 있으면 스킵 (리포스트 중복 방지)
+        same_site = self.db.execute(
+            select(TrendArticle).where(
+                TrendArticle.trend_id == trend.id,
+                TrendArticle.site_id == site_id,
+            )
+        ).scalar_one_or_none()
+
+        if same_site:
+            return None
 
         article = TrendArticle(
             trend_id=trend.id,
@@ -94,7 +106,7 @@ class TrendService:
                 TrendImage.trend_id == trend.id,
                 TrendImage.url == image_data["url"],
             )
-        ).scalars().first()
+        ).scalar_one_or_none()
 
         if existing:
             if not existing.storage_key and image_data.get("storage_key"):
@@ -123,18 +135,72 @@ class TrendService:
             phash=image_data.get("phash"),
             width=image_data.get("width"),
             height=image_data.get("height"),
+            media_type=image_data.get("media_type", "image"),
             order=len(trend.images),
         )
         self.db.add(image)
         return image
 
-    def calculate_score(self, trend: Trend) -> float:
-        """트렌드 점수 계산"""
-        # 기본 점수: 글 수 × 사이트 다양성 보너스
-        article_count = len(trend.articles)
-        site_count = trend.site_count
+    def _get_site_stats(self) -> dict:
+        """각 사이트의 최근 engagement 평균 (정규화용, 세션 내 캐싱)"""
+        if self._site_stats_cache is not None:
+            return self._site_stats_cache
 
-        base_score = article_count * (1 + math.log(max(site_count, 1)))
+        cutoff = datetime.utcnow() - timedelta(hours=72)
+        rows = self.db.execute(
+            select(
+                TrendArticle.site_id,
+                func.avg(TrendArticle.view_count),
+                func.avg(TrendArticle.like_count),
+                func.avg(TrendArticle.comment_count),
+            )
+            .where(TrendArticle.created_at > cutoff)
+            .group_by(TrendArticle.site_id)
+        ).all()
+
+        stats = {}
+        for site_id, avg_views, avg_likes, avg_comments in rows:
+            stats[site_id] = {
+                "avg_views": max(float(avg_views or 0), 1),
+                "avg_likes": max(float(avg_likes or 0), 1),
+                "avg_comments": max(float(avg_comments or 0), 1),
+            }
+        self._site_stats_cache = stats
+        return stats
+
+    def calculate_score(self, trend: Trend) -> float:
+        """트렌드 점수 계산 (사이트별 정규화 + 다양성 + 시간 감쇠)"""
+        articles = trend.articles
+        site_stats = self._get_site_stats()
+
+        # 사이트별 정규화: 각 글의 engagement를 해당 사이트 평균으로 나눔
+        # → "사이트 내에서 얼마나 핫한가" (1.0 = 평균, 2.0 = 평균의 2배)
+        norm_views = 0.0
+        norm_likes = 0.0
+        norm_comments = 0.0
+        for a in articles:
+            s = site_stats.get(a.site_id)
+            if s:
+                norm_views += a.view_count / s["avg_views"]
+                norm_likes += a.like_count / s["avg_likes"]
+                norm_comments += a.comment_count / s["avg_comments"]
+            else:
+                # 새 사이트 (통계 없음) → 기본값 사용
+                norm_views += math.log1p(a.view_count / 100)
+                norm_likes += math.log1p(a.like_count)
+                norm_comments += math.log1p(a.comment_count)
+
+        engagement = (
+            1
+            + math.log1p(norm_views) * 1.0
+            + math.log1p(norm_likes) * 2.0
+            + math.log1p(norm_comments) * 1.5
+        )
+
+        # 사이트 다양성 보너스
+        diversity = 1 + math.log(max(trend.site_count, 1))
+
+        base_score = engagement * diversity
 
         # 시간 감쇠
         hours_old = (datetime.utcnow() - trend.created_at).total_seconds() / 3600

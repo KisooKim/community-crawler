@@ -74,24 +74,25 @@ class BobaedreamCrawler(BaseCrawler):
             if nums:
                 comment_count = int(nums[0])
 
-        image_urls = self._get_article_images(href)
+        image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
             title=title,
             url=href,
             image_urls=image_urls,
+            video_urls=video_urls,
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
         try:
             soup = self.fetch_html(url)
             images = []
             content = soup.select_one("div.bodyCont")
             if not content:
-                return []
+                return [], []
 
             for img in content.select("img"):
                 src = img.get("src") or img.get("data-src")
@@ -102,9 +103,10 @@ class BobaedreamCrawler(BaseCrawler):
                         src = self.base_url + "/" + src.lstrip("/")
                     images.append(src)
 
-            return images[:10]
+            videos = self._extract_videos(content)
+            return images[:10], videos
         except Exception:
-            return []
+            return [], []
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank", "noimg"]
