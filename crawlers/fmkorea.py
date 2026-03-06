@@ -65,17 +65,8 @@ class FmKoreaCrawler(BaseCrawler):
         if not href.startswith("http"):
             href = self.base_url + href
 
-        # 리스트 썸네일
-        image_urls = []
-        thumb = item.select_one("img")
-        if thumb:
-            src = thumb.get("data-original") or thumb.get("src") or ""
-            if src and self._is_valid_image(src):
-                if src.startswith("//"):
-                    src = "https:" + src
-                elif not src.startswith("http"):
-                    src = self.base_url + src
-                image_urls.append(src)
+        # 상세 페이지에서 원본 이미지 + 비디오 + 조회수
+        image_urls, video_urls, view_count = self._get_article_detail(href)
 
         # 추천수
         like_count = 0
@@ -95,9 +86,47 @@ class FmKoreaCrawler(BaseCrawler):
             title=title,
             url=href,
             image_urls=image_urls,
+            video_urls=video_urls,
+            view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
         )
+
+    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int]:
+        """상세 페이지에서 원본 이미지 + 비디오 + 조회수 추출 (httpx)"""
+        try:
+            soup = self.fetch_html(url)
+
+            # 조회수
+            view_count = 0
+            side = soup.select_one(".btm_area .side.fr")
+            if side:
+                for span in side.select("span"):
+                    if "조회" in span.get_text(strip=True):
+                        b = span.select_one("b")
+                        if b:
+                            nums = re.findall(r"\d+", b.get_text(strip=True).replace(",", ""))
+                            if nums:
+                                view_count = int(nums[0])
+                        break
+
+            # 이미지
+            images = []
+            content = soup.select_one(".xe_content")
+            if content:
+                for img in content.select("img"):
+                    src = img.get("data-original") or img.get("src")
+                    if src and self._is_valid_image(src):
+                        if src.startswith("//"):
+                            src = "https:" + src
+                        elif not src.startswith("http"):
+                            src = self.base_url + src
+                        images.append(src)
+
+            videos = self._extract_videos(content) if content else []
+            return images[:10], videos, view_count
+        except Exception:
+            return [], [], 0
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_"]
