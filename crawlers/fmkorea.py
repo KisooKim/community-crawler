@@ -1,9 +1,13 @@
 import re
+import time
+import random
+from bs4 import BeautifulSoup
+from scrapling.fetchers import StealthyFetcher
 from crawlers.base import BaseCrawler, ArticleData
 
 
 class FmKoreaCrawler(BaseCrawler):
-    """에펨코리아 크롤러 (httpx, self-hosted runner 전용)"""
+    """에펨코리아 크롤러 (Scrapling StealthyFetcher, self-hosted runner 전용)"""
 
     @property
     def site_name(self) -> str:
@@ -17,12 +21,21 @@ class FmKoreaCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://www.fmkorea.com"
 
+    def _fetch_stealth(self, url: str, delay: bool = True) -> BeautifulSoup:
+        if delay:
+            time.sleep(random.uniform(2.0, 5.0))
+        page = StealthyFetcher.fetch(
+            url, headless=True, network_idle=True,
+            wait=random.randint(2, 4),
+        )
+        return BeautifulSoup(page.body, "lxml")
+
     def get_popular_articles(self) -> list[ArticleData]:
         """포텐 터짐 화제순"""
         articles = []
         for page in range(1, self.MAX_PAGES + 1):
             url = f"{self.base_url}/best2?page={page}"
-            soup = self.fetch_html(url, delay=(page > 1))
+            soup = self._fetch_stealth(url, delay=(page > 1))
 
             items = soup.select("li.li")
             if not items:

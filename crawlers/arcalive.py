@@ -1,9 +1,13 @@
 import re
+import time
+import random
+from bs4 import BeautifulSoup
+from scrapling.fetchers import StealthyFetcher
 from crawlers.base import BaseCrawler, ArticleData
 
 
 class ArcaliveCrawler(BaseCrawler):
-    """아카라이브 크롤러 (httpx, self-hosted runner 전용)"""
+    """아카라이브 크롤러 (Scrapling StealthyFetcher, self-hosted runner 전용)"""
 
     @property
     def site_name(self) -> str:
@@ -17,13 +21,19 @@ class ArcaliveCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://arca.live"
 
+    def _fetch_stealth(self, url: str) -> BeautifulSoup:
+        page = StealthyFetcher.fetch(
+            url, headless=True, network_idle=True,
+            wait=random.randint(2, 4),
+        )
+        return BeautifulSoup(page.body, "lxml")
+
     def get_popular_articles(self) -> list[ArticleData]:
         """베스트 라이브 수집"""
         articles = []
-        url = f"{self.base_url}/b/live"
-        soup = self.fetch_html(url, delay=False)
+        soup = self._fetch_stealth(f"{self.base_url}/b/live")
 
-        for row in soup.select("a.vrow.column")[:30]:
+        for row in soup.select("div.vrow.hybrid")[:30]:
             try:
                 article = self._parse_row(row)
                 if article:
@@ -34,24 +44,24 @@ class ArcaliveCrawler(BaseCrawler):
         return articles
 
     def _parse_row(self, row) -> ArticleData | None:
-        # 제목
-        title_el = row.select_one(".vrow-top .title")
-        if not title_el:
-            title_el = row.select_one(".title")
-        if not title_el:
+        # 제목 + 링크: a.title.hybrid-title
+        link = row.select_one("a.title.hybrid-title") or row.select_one("a.title")
+        if not link:
             return None
 
-        title = title_el.get_text(strip=True)
+        # 제목 텍스트 (댓글수 [N] 제외)
+        title_text = link.get_text(strip=True)
+        title = re.sub(r"\[\d+\]$", "", title_text).strip()
         if not title:
             return None
 
-        href = row.get("href", "")
+        href = link.get("href", "")
         if not href.startswith("http"):
             href = self.base_url + href
 
         # 썸네일
         image_urls = []
-        thumb = row.select_one("img.vrow-preview, img")
+        thumb = row.select_one("img")
         if thumb:
             src = thumb.get("src") or thumb.get("data-src") or ""
             if src and "icon" not in src.lower() and "emoticon" not in src.lower():
@@ -63,7 +73,7 @@ class ArcaliveCrawler(BaseCrawler):
 
         # 추천수
         like_count = 0
-        rate_el = row.select_one(".col-rate, .vrow-bottom .col-rate")
+        rate_el = row.select_one(".col-rate")
         if rate_el:
             nums = re.findall(r"\d+", rate_el.get_text(strip=True))
             if nums:
@@ -71,7 +81,7 @@ class ArcaliveCrawler(BaseCrawler):
 
         # 조회수
         view_count = 0
-        view_el = row.select_one(".col-view, .vrow-bottom .col-view")
+        view_el = row.select_one(".col-view")
         if view_el:
             nums = re.findall(r"\d+", view_el.get_text(strip=True).replace(",", ""))
             if nums:

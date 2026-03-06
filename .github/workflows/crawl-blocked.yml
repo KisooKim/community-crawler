@@ -19,6 +19,10 @@ jobs:
           pip install httpx beautifulsoup4 lxml
           pip install imagehash Pillow
           pip install psycopg2-binary asyncpg greenlet
+          pip install "scrapling[all]"
+
+      - name: Install Patchright Chromium
+        run: python -m patchright install chromium
 
       - name: Run blocked-site crawlers
         env:
