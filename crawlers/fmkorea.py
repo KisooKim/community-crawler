@@ -93,9 +93,9 @@ class FmKoreaCrawler(BaseCrawler):
         )
 
     def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int]:
-        """상세 페이지에서 원본 이미지 + 비디오 + 조회수 추출 (httpx)"""
+        """상세 페이지에서 원본 이미지 + 비디오 + 조회수 추출 (StealthyFetcher)"""
         try:
-            soup = self.fetch_html(url)
+            soup = self._fetch_stealth(url)
 
             # 조회수
             view_count = 0
