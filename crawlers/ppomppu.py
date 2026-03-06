@@ -38,6 +38,12 @@ class PpomppuCrawler(BaseCrawler):
 
         return articles
 
+    COMMERCIAL_BOARDS = {
+        "ppomppu", "ppomppu2", "ppomppu4", "ppomppu8",
+        "hotdeal", "pmarket", "pmarket2", "pmarket3",
+        "card_market", "pmarket7", "pmarket8",
+    }
+
     def _parse_row(self, row) -> ArticleData | None:
         title_td = row.select_one("td.title")
         if not title_td:
@@ -60,6 +66,11 @@ class PpomppuCrawler(BaseCrawler):
         # href가 /zboard/... 형태이므로 base_url에 바로 붙임
         if not href.startswith("http"):
             href = self.base_url + href
+
+        # 상업성 게시판 제외
+        board_id_match = re.search(r"[?&]id=([^&]+)", href)
+        if board_id_match and board_id_match.group(1) in self.COMMERCIAL_BOARDS:
+            return None
 
         view_count = 0
         like_count = 0
