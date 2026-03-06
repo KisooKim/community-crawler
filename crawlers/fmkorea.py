@@ -2,6 +2,7 @@ import re
 import time
 import random
 from bs4 import BeautifulSoup
+from patchright.sync_api import sync_playwright
 from crawlers.base import BaseCrawler, ArticleData
 
 
@@ -22,7 +23,6 @@ class FmKoreaCrawler(BaseCrawler):
 
     def get_popular_articles(self) -> list[ArticleData]:
         """포텐 터짐 화제순 — 단일 브라우저로 리스트+상세 모두 처리"""
-        from patchright.sync_api import sync_playwright
         pw = sync_playwright().start()
         browser = pw.chromium.launch(headless=True)
         context = browser.new_context(

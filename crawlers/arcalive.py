@@ -2,6 +2,7 @@ import re
 import time
 import random
 from bs4 import BeautifulSoup
+from scrapling.fetchers import StealthyFetcher
 from crawlers.base import BaseCrawler, ArticleData
 
 
@@ -21,7 +22,6 @@ class ArcaliveCrawler(BaseCrawler):
         return "https://arca.live"
 
     def _fetch_stealth(self, url: str) -> BeautifulSoup:
-        from scrapling.fetchers import StealthyFetcher
         page = StealthyFetcher.fetch(
             url, headless=True, network_idle=True,
             wait=random.randint(2, 4),

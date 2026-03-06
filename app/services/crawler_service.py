@@ -20,10 +20,24 @@ from crawlers.slrclub import SlrclubCrawler
 from crawlers.orbi import OrbiCrawler
 from crawlers.coinpan import CoinpanCrawler
 from crawlers.cook82 import Cook82Crawler
-from crawlers.fmkorea import FmKoreaCrawler
-from crawlers.arcalive import ArcaliveCrawler
 
 logger = logging.getLogger(__name__)
+
+
+def _get_blocked_crawlers() -> dict:
+    """차단된 사이트 크롤러를 lazy import (patchright/scrapling은 self-hosted runner만 설치)"""
+    result = {}
+    try:
+        from crawlers.fmkorea import FmKoreaCrawler
+        result["fmkorea"] = FmKoreaCrawler
+    except ImportError:
+        pass
+    try:
+        from crawlers.arcalive import ArcaliveCrawler
+        result["arcalive"] = ArcaliveCrawler
+    except ImportError:
+        pass
+    return result
 
 
 class CrawlerService:
@@ -44,8 +58,7 @@ class CrawlerService:
         "orbi": OrbiCrawler,
         "coinpan": CoinpanCrawler,
         "cook82": Cook82Crawler,
-        "fmkorea": FmKoreaCrawler,
-        "arcalive": ArcaliveCrawler,
+        **_get_blocked_crawlers(),
     }
 
     # 데이터센터 IP에서 차단되는 사이트 (self-hosted runner 전용)
