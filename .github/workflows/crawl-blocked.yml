@@ -21,13 +21,21 @@ jobs:
           DEBUG: "false"
         run: |
           python -c "
+          import time, sys
+          t0 = time.time()
+          def log(msg): print(f'[{time.time()-t0:.1f}s] {msg}', flush=True)
+          log('importing modules...')
           import app.models.trend
           from app.core.database import Base, sync_engine
+          log('creating tables...')
           Base.metadata.create_all(sync_engine)
+          log('importing crawlers...')
           from app.services.crawler_service import CrawlerService
           from app.core.database import SyncSessionLocal
+          log('starting crawl...')
           results = []
           for site_name in sorted(CrawlerService.BLOCKED_SITES):
+              log(f'crawling {site_name}...')
               with SyncSessionLocal() as db:
                   service = CrawlerService(db)
                   try:
@@ -35,6 +43,7 @@ jobs:
                   except Exception as e:
                       r = {'site': site_name, 'error': str(e)}
                   results.append(r)
+              log(f'{site_name} done: {r.get(\"processed\", 0)} articles')
           for r in results:
               status = 'OK' if 'error' not in r else 'FAIL'
               name = r.get('site', 'unknown')
