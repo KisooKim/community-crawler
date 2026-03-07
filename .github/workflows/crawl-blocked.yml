@@ -8,7 +8,7 @@ on:
 jobs:
   crawl:
     runs-on: self-hosted
-    timeout-minutes: 90
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +25,16 @@ jobs:
           from app.core.database import Base, sync_engine
           Base.metadata.create_all(sync_engine)
           from app.services.crawler_service import CrawlerService
-          results = CrawlerService.crawl_all_parallel(only=list(CrawlerService.BLOCKED_SITES))
+          from app.core.database import SyncSessionLocal
+          results = []
+          for site_name in sorted(CrawlerService.BLOCKED_SITES):
+              with SyncSessionLocal() as db:
+                  service = CrawlerService(db)
+                  try:
+                      r = service.crawl_site(site_name)
+                  except Exception as e:
+                      r = {'site': site_name, 'error': str(e)}
+                  results.append(r)
           for r in results:
               status = 'OK' if 'error' not in r else 'FAIL'
               name = r.get('site', 'unknown')
