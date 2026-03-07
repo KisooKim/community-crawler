@@ -87,7 +87,7 @@ class RuliwebCrawler(BaseCrawler):
                         src = "https:" + src
                     images.append(src)
 
-            return images[:10]
+            return images[:50]
         except Exception:
             return []
 

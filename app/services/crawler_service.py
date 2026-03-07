@@ -209,10 +209,10 @@ class CrawlerService:
         # (article_url, index, url, media_type) 튜플 리스트
         tasks = []
         for article in articles:
-            for i, img_url in enumerate(article.image_urls[:10]):
+            for i, img_url in enumerate(article.image_urls[:50]):
                 tasks.append((article.url, i, img_url, "image"))
             # 비디오는 이미지 뒤에 붙임
-            offset = len(article.image_urls[:10])
+            offset = len(article.image_urls[:50])
             for j, vid_url in enumerate(article.video_urls[:5]):
                 tasks.append((article.url, offset + j, vid_url, "video"))
 

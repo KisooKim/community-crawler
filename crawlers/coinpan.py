@@ -148,7 +148,7 @@ class CoinpanCrawler:
                         src = self.base_url + src
                     videos.append(src)
 
-            return images[:10], videos[:5]
+            return images[:50], videos[:5]
         except Exception:
             return [], []
 

@@ -100,7 +100,7 @@ class TheqooCrawler(BaseCrawler):
                         images.append(src)
 
             videos = self._extract_videos(content) if content else []
-            return images[:10], videos, 0
+            return images[:50], videos, 0
         except Exception:
             return [], [], 0
 

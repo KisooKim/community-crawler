@@ -108,7 +108,7 @@ class TodayhumorCrawler(BaseCrawler):
                     images.append(src)
 
             videos = self._extract_videos(content)
-            return images[:10], videos
+            return images[:50], videos
         except Exception:
             return [], []
 

@@ -112,7 +112,7 @@ class MlbparkCrawler(BaseCrawler):
                         images.append(src)
 
             videos = self._extract_videos(content) if content else []
-            return images[:10], videos, like_count, view_count, comment_count
+            return images[:50], videos, like_count, view_count, comment_count
         except Exception:
             return [], [], 0, 0, 0
 
