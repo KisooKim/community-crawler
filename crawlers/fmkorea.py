@@ -37,7 +37,7 @@ class FmKoreaCrawler(BaseCrawler):
                 url = f"{self.base_url}/best2?page={pg}"
                 if pg > 1:
                     time.sleep(random.uniform(2.0, 4.0))
-                page.goto(url, wait_until="networkidle", timeout=30000)
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 soup = BeautifulSoup(page.content(), "lxml")
 
                 items = soup.select("li.li")
@@ -104,7 +104,7 @@ class FmKoreaCrawler(BaseCrawler):
         """상세 페이지에서 원본 이미지 + 비디오 + 조회수 추출 (브라우저 재사용)"""
         try:
             time.sleep(random.uniform(1.0, 2.0))
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
             soup = BeautifulSoup(page.content(), "lxml")
 
             # 조회수
