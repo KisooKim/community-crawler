@@ -15,9 +15,9 @@ jobs:
 
       - name: Install Python dependencies
         timeout-minutes: 5
-        shell: bash
         run: |
-          python -c "import scrapling, sqlalchemy, httpx, bs4, imagehash, psycopg2, asyncpg, patchright" && echo "All packages already installed" || {
+          python -c "import scrapling, sqlalchemy, httpx, bs4, imagehash, psycopg2, asyncpg, patchright"
+          if ($LASTEXITCODE -eq 0) { echo "All packages already installed" } else {
             pip install sqlalchemy pydantic pydantic-settings python-dotenv httpx beautifulsoup4 lxml imagehash Pillow psycopg2-binary asyncpg greenlet "scrapling[all]"
             python -m patchright install chromium
           }
