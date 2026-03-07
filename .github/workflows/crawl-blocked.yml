@@ -24,13 +24,24 @@ jobs:
           import time, sys
           t0 = time.time()
           def log(msg): print(f'[{time.time()-t0:.1f}s] {msg}', flush=True)
-          log('importing modules...')
-          import app.models.trend
+          log('step 1: importing sqlalchemy...')
+          import sqlalchemy
+          log('step 2: importing asyncpg...')
+          import asyncpg
+          log('step 3: importing pydantic_settings...')
+          import pydantic_settings
+          log('step 4: importing psycopg2...')
+          import psycopg2
+          log('step 5: importing app.core.config...')
+          from app.core.config import get_settings
+          log('step 6: importing app.core.database...')
           from app.core.database import Base, sync_engine
+          log('step 7: importing app.models.trend...')
+          import app.models.trend
+          log('step 8: importing CrawlerService...')
+          from app.services.crawler_service import CrawlerService
           log('creating tables...')
           Base.metadata.create_all(sync_engine)
-          log('importing crawlers...')
-          from app.services.crawler_service import CrawlerService
           from app.core.database import SyncSessionLocal
           log('starting crawl...')
           results = []
