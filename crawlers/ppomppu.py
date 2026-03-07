@@ -41,7 +41,7 @@ class PpomppuCrawler(BaseCrawler):
     COMMERCIAL_BOARDS = {
         "ppomppu", "ppomppu2", "ppomppu4", "ppomppu8",
         "hotdeal", "pmarket", "pmarket2", "pmarket3",
-        "card_market", "pmarket7", "pmarket8",
+        "card_market", "pmarket7", "pmarket8", "sponsor",
     }
 
     def _parse_row(self, row) -> ArticleData | None:
