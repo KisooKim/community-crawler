@@ -14,15 +14,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Python dependencies
+        timeout-minutes: 5
+        shell: bash
         run: |
-          pip install sqlalchemy pydantic pydantic-settings python-dotenv
-          pip install httpx beautifulsoup4 lxml
-          pip install imagehash Pillow
-          pip install psycopg2-binary asyncpg greenlet
-          pip install "scrapling[all]"
-
-      - name: Install Patchright Chromium
-        run: python -m patchright install chromium
+          python -c "import scrapling, sqlalchemy, httpx, bs4, imagehash, psycopg2, asyncpg, patchright" && echo "All packages already installed" || {
+            pip install sqlalchemy pydantic pydantic-settings python-dotenv httpx beautifulsoup4 lxml imagehash Pillow psycopg2-binary asyncpg greenlet "scrapling[all]"
+            python -m patchright install chromium
+          }
 
       - name: Run blocked-site crawlers
         env:
