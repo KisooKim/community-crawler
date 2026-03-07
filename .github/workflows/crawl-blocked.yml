@@ -43,7 +43,8 @@ jobs:
                   except Exception as e:
                       r = {'site': site_name, 'error': str(e)}
                   results.append(r)
-              log(f'{site_name} done: {r.get(\"processed\", 0)} articles')
+              cnt = r.get('processed', 0)
+              log(f'{site_name} done: {cnt} articles')
           for r in results:
               status = 'OK' if 'error' not in r else 'FAIL'
               name = r.get('site', 'unknown')
