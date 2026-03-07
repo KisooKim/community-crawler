@@ -101,7 +101,13 @@ class CrawlerService:
             site = self.get_or_create_site(crawler)
             self.db.commit()
             referer = crawler.base_url
-            articles = crawler.get_popular_articles()
+
+            # 기존 URL을 전달하여 상세 페이지 방문 스킵 (FmKorea 등)
+            existing = self.db.execute(
+                select(TrendArticle.url).where(TrendArticle.site_id == site.id)
+            ).all()
+            skip_urls = set(row[0] for row in existing)
+            articles = crawler.get_popular_articles(skip_urls=skip_urls)
 
             # URL 중복 제거 (같은 글이 여러 리스트 페이지에 등장하는 경우)
             seen_urls = set()

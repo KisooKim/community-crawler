@@ -21,8 +21,8 @@ class FmKoreaCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://www.fmkorea.com"
 
-    def get_popular_articles(self) -> list[ArticleData]:
-        """포텐 터짐 화제순 — 단일 브라우저로 리스트+상세 모두 처리"""
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
+        """포텐 터짐 화제순 — 리스트 파싱 후 새 글만 상세 페이지 방문"""
         pw = sync_playwright().start()
         browser = pw.chromium.launch(headless=True)
         context = browser.new_context(
@@ -33,6 +33,8 @@ class FmKoreaCrawler(BaseCrawler):
 
         articles = []
         try:
+            # 1단계: 리스트 페이지에서 기본 정보 수집
+            list_items = []
             for pg in range(1, self.MAX_PAGES + 1):
                 url = f"{self.base_url}/best2?page={pg}"
                 if pg > 1:
@@ -45,12 +47,20 @@ class FmKoreaCrawler(BaseCrawler):
                     break
 
                 for item in items:
-                    try:
-                        article = self._parse_item(item, page)
-                        if article:
-                            articles.append(article)
-                    except Exception:
-                        continue
+                    parsed = self._parse_list_item(item)
+                    if parsed:
+                        list_items.append(parsed)
+
+            # 2단계: 새 글만 상세 페이지 방문
+            for info in list_items:
+                if skip_urls and info["url"] in skip_urls:
+                    continue
+                try:
+                    article = self._build_article(info, page)
+                    if article:
+                        articles.append(article)
+                except Exception:
+                    continue
         finally:
             page.close()
             context.close()
@@ -59,7 +69,8 @@ class FmKoreaCrawler(BaseCrawler):
 
         return articles
 
-    def _parse_item(self, item, page) -> ArticleData | None:
+    def _parse_list_item(self, item) -> dict | None:
+        """리스트 아이템에서 기본 정보만 추출 (상세 페이지 방문 없음)"""
         link = item.select_one("h3.title a")
         if not link:
             return None
@@ -73,10 +84,6 @@ class FmKoreaCrawler(BaseCrawler):
         if not href.startswith("http"):
             href = self.base_url + href
 
-        # 상세 페이지에서 원본 이미지 + 비디오 + 조회수 (같은 브라우저 재사용)
-        image_urls, video_urls, view_count = self._get_article_detail(href, page)
-
-        # 추천수
         like_count = 0
         count_el = item.select_one(".count")
         if count_el:
@@ -84,20 +91,30 @@ class FmKoreaCrawler(BaseCrawler):
             if nums:
                 like_count = int(nums[0])
 
-        # 댓글수
         comment_count = 0
         cm = re.search(r"\[(\d+)\]", title_text)
         if cm:
             comment_count = int(cm.group(1))
 
+        return {
+            "title": title,
+            "url": href,
+            "like_count": like_count,
+            "comment_count": comment_count,
+        }
+
+    def _build_article(self, info: dict, page) -> ArticleData | None:
+        """상세 페이지 방문하여 완전한 ArticleData 생성"""
+        image_urls, video_urls, view_count = self._get_article_detail(info["url"], page)
+
         return ArticleData(
-            title=title,
-            url=href,
+            title=info["title"],
+            url=info["url"],
             image_urls=image_urls,
             video_urls=video_urls,
             view_count=view_count,
-            like_count=like_count,
-            comment_count=comment_count,
+            like_count=info["like_count"],
+            comment_count=info["comment_count"],
         )
 
     def _get_article_detail(self, url: str, page) -> tuple[list[str], list[str], int]:

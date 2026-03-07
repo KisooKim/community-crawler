@@ -91,8 +91,8 @@ class BaseCrawler(ABC):
         pass
 
     @abstractmethod
-    def get_popular_articles(self) -> list[ArticleData]:
-        """인기글 목록 수집"""
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
+        """인기글 목록 수집. skip_urls가 주어지면 해당 URL은 상세 페이지 방문 생략."""
         pass
 
     def fetch_html(self, url: str, delay: bool = True) -> BeautifulSoup:
