@@ -2,12 +2,12 @@ import re
 import time
 import random
 from bs4 import BeautifulSoup
-from scrapling.fetchers import StealthyFetcher
+from patchright.sync_api import sync_playwright
 from crawlers.base import BaseCrawler, ArticleData
 
 
 class ArcaliveCrawler(BaseCrawler):
-    """아카라이브 크롤러 (Scrapling StealthyFetcher, self-hosted runner 전용)"""
+    """아카라이브 크롤러 (Patchright, self-hosted runner 전용)"""
 
     @property
     def site_name(self) -> str:
@@ -21,25 +21,34 @@ class ArcaliveCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://arca.live"
 
-    def _fetch_stealth(self, url: str) -> BeautifulSoup:
-        page = StealthyFetcher.fetch(
-            url, headless=True, network_idle=True,
-            wait=random.randint(2, 4),
-        )
-        return BeautifulSoup(page.body, "lxml")
-
     def get_popular_articles(self) -> list[ArticleData]:
         """베스트 라이브 수집"""
-        articles = []
-        soup = self._fetch_stealth(f"{self.base_url}/b/live")
+        pw = sync_playwright().start()
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            locale="ko-KR",
+        )
+        page = context.new_page()
 
-        for row in soup.select("div.vrow.hybrid")[:30]:
-            try:
-                article = self._parse_row(row)
-                if article:
-                    articles.append(article)
-            except Exception:
-                continue
+        articles = []
+        try:
+            page.goto(f"{self.base_url}/b/live", wait_until="domcontentloaded", timeout=30000)
+            time.sleep(random.uniform(6, 10))  # Cloudflare challenge 대기
+            soup = BeautifulSoup(page.content(), "lxml")
+
+            for row in soup.select("div.vrow.hybrid")[:30]:
+                try:
+                    article = self._parse_row(row)
+                    if article:
+                        articles.append(article)
+                except Exception:
+                    continue
+        finally:
+            page.close()
+            context.close()
+            browser.close()
+            pw.stop()
 
         return articles
 
