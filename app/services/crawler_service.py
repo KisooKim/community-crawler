@@ -110,6 +110,10 @@ class CrawlerService:
                 select(TrendArticle.url).where(TrendArticle.site_id == site.id)
             ).all()
             skip_urls = set(row[0] for row in existing)
+
+            # DB 커넥션 반환 (크롤링 중 idle timeout 방지)
+            self.db.close()
+
             articles = crawler.get_popular_articles(skip_urls=skip_urls)
 
             # URL 중복 제거 (같은 글이 여러 리스트 페이지에 등장하는 경우)
@@ -121,7 +125,15 @@ class CrawlerService:
                     unique_articles.append(a)
             articles = unique_articles
 
-            # 0단계: 이미 DB에 있는 글 URL 필터링 (이미지 다운로드 절약)
+            # 1단계: 새 글만 이미지+비디오 다운로드 + pHash 병렬 처리
+            # (DB 없이 순수 네트워크 작업)
+            image_results = self._prefetch_media([a for a in articles if a.url not in skip_urls], referer)
+
+            # DB 재연결 후 저장
+            # (sessionmaker가 pool_pre_ping으로 유효한 커넥션 제공)
+            self.db.connection()
+
+            # 0단계: 이미 DB에 있는 글 URL 필터링
             existing_urls = set(
                 row[0] for row in self.db.execute(
                     select(TrendArticle.url).where(
@@ -131,9 +143,6 @@ class CrawlerService:
             )
             new_articles = [a for a in articles if a.url not in existing_urls]
             logger.info(f"[{site_name}] {len(articles)} found, {len(new_articles)} new, {len(existing_urls)} skipped (already in DB)")
-
-            # 1단계: 새 글만 이미지+비디오 다운로드 + pHash 병렬 처리
-            image_results = self._prefetch_media(new_articles, referer)
 
             # 2단계: DB 저장
             processed = 0

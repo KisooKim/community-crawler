@@ -8,7 +8,7 @@ on:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
           from app.core.database import Base, sync_engine
           Base.metadata.create_all(sync_engine)
           from app.services.crawler_service import CrawlerService
-          results = CrawlerService.crawl_all_parallel(exclude=list(CrawlerService.BLOCKED_SITES))
+          results = CrawlerService.crawl_all_parallel(max_workers=3, exclude=list(CrawlerService.BLOCKED_SITES))
           for r in results:
               status = 'OK' if 'error' not in r else 'FAIL'
               name = r.get('site', 'unknown')
