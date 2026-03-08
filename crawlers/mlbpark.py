@@ -27,7 +27,7 @@ class MlbparkCrawler(BaseCrawler):
         rows = soup.select("table.tbl_type01 tbody tr")
         for row in rows:
             try:
-                article = self._parse_row(row)
+                article = self._parse_row(row, skip_urls)
                 if article:
                     articles.append(article)
             except Exception:
@@ -35,7 +35,7 @@ class MlbparkCrawler(BaseCrawler):
 
         return articles
 
-    def _parse_row(self, row) -> ArticleData | None:
+    def _parse_row(self, row, skip_urls: set[str] | None = None) -> ArticleData | None:
         title_link = row.select_one("a.txt")
         if not title_link:
             return None
@@ -53,6 +53,9 @@ class MlbparkCrawler(BaseCrawler):
         params = parse_qs(parsed.query, keep_blank_values=True)
         params.pop("p", None)
         href = urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
+
+        if skip_urls and href in skip_urls:
+            return None
 
         # best.php doesn't show engagement on list — get from detail page
         images, video_urls, like_count, view_count, comment_count = self._get_article_detail(href)
