@@ -18,7 +18,6 @@ from crawlers.mlbpark import MlbparkCrawler
 from crawlers.inven import InvenCrawler
 from crawlers.slrclub import SlrclubCrawler
 from crawlers.orbi import OrbiCrawler
-from crawlers.coinpan import CoinpanCrawler
 from crawlers.cook82 import Cook82Crawler
 
 logger = logging.getLogger(__name__)
@@ -35,6 +34,11 @@ def _get_blocked_crawlers() -> dict:
     try:
         from crawlers.arcalive import ArcaliveCrawler
         result["arcalive"] = ArcaliveCrawler
+    except ImportError:
+        pass
+    try:
+        from crawlers.coinpan import CoinpanCrawler
+        result["coinpan"] = CoinpanCrawler
     except ImportError:
         pass
     return result
@@ -56,13 +60,12 @@ class CrawlerService:
         "inven": InvenCrawler,
         "slrclub": SlrclubCrawler,
         "orbi": OrbiCrawler,
-        "coinpan": CoinpanCrawler,
         "cook82": Cook82Crawler,
         **_get_blocked_crawlers(),
     }
 
     # 데이터센터 IP에서 차단되는 사이트 (self-hosted runner 전용)
-    BLOCKED_SITES = {"fmkorea", "arcalive"}
+    BLOCKED_SITES = {"fmkorea", "arcalive", "coinpan"}
 
     def __init__(self, db: Session = None):
         self.db = db

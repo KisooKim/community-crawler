@@ -31,6 +31,8 @@ sync_engine = create_engine(
     echo=settings.debug,
     pool_size=5,
     max_overflow=10,
+    pool_pre_ping=True,
+    pool_recycle=120,
 )
 
 SyncSessionLocal = sessionmaker(
