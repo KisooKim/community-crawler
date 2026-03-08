@@ -13,18 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Add Windows Defender exclusion for Python
-        run: |
-          $pyPath = (python -c "import sys; print(sys.prefix)").Trim()
-          Write-Host "Python prefix: $pyPath"
-          Write-Host "Python version: $(python --version)"
-          try {
-            Add-MpPreference -ExclusionPath $pyPath -ErrorAction Stop
-            Write-Host "Added Defender exclusion for $pyPath"
-          } catch {
-            Write-Host "Could not add Defender exclusion (may need admin): $_"
-          }
-
       - name: Run blocked-site crawlers
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -33,9 +21,19 @@ jobs:
           DEBUG: "false"
         run: |
           python -c "
-          import time, sys
+          import time, sys, os, platform
           t0 = time.time()
           def log(msg): print(f'[{time.time()-t0:.1f}s] {msg}', flush=True)
+
+          # Workaround: platform.uname() hangs on Python 3.14 + Windows (WMI bug)
+          platform._uname_cache = platform.uname_result(
+              'Windows',
+              os.environ.get('COMPUTERNAME', ''),
+              '11',
+              '10.0.26200',
+              os.environ.get('PROCESSOR_ARCHITECTURE', 'AMD64'),
+          )
+
           log('importing modules...')
           import app.models.trend
           from app.core.database import Base, sync_engine
