@@ -17,7 +17,7 @@ class InvenCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://www.inven.co.kr"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """오픈이슈 갤러리 10추글"""
         articles = []
         for page in range(1, self.MAX_PAGES + 1):

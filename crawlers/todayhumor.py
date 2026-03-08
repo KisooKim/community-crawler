@@ -17,7 +17,7 @@ class TodayhumorCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "http://www.todayhumor.co.kr"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """베스트오브베스트 게시판"""
         articles = []
         for page in range(1, self.MAX_PAGES + 1):

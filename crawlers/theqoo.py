@@ -17,7 +17,7 @@ class TheqooCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://theqoo.net"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """핫 게시판"""
         articles = []
         for page in range(1, self.MAX_PAGES + 1):

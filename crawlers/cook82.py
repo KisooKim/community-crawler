@@ -17,7 +17,7 @@ class Cook82Crawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://www.82cook.com"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """자유게시판 인기글"""
         articles = []
         for page in range(1, self.MAX_PAGES + 1):

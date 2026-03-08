@@ -21,7 +21,7 @@ class ArcaliveCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://arca.live"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """베스트 라이브 수집"""
         pw = sync_playwright().start()
         browser = pw.chromium.launch(headless=True)

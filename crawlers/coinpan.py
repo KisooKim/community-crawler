@@ -28,7 +28,7 @@ class CoinpanCrawler:
     def base_url(self) -> str:
         return "https://coinpan.com"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """자유게시판 추천순"""
         articles = []
         for page_num in range(1, self.MAX_PAGES + 1):

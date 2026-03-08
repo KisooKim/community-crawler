@@ -18,7 +18,7 @@ class MlbparkCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://mlbpark.donga.com"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """TODAY BEST 인기글 수집"""
         articles = []
         url = f"{self.base_url}/mp/best.php?b=bullpen"

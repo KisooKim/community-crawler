@@ -17,7 +17,7 @@ class RuliwebCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://bbs.ruliweb.com"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """베스트 유머 게시판"""
         articles = []
         url = f"{self.base_url}/best/humor"

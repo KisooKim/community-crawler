@@ -17,7 +17,7 @@ class InstizCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://www.instiz.net"
 
-    def get_popular_articles(self) -> list[ArticleData]:
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
         """HOT 게시판"""
         articles = []
         url = f"{self.base_url}/hot.htm"
