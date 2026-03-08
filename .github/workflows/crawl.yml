@@ -2,7 +2,7 @@ name: Crawl Communities
 
 on:
   schedule:
-    - cron: "0 */2 * * *" # 2시간마다
+    - cron: "*/30 * * * *" # 30분마다
   workflow_dispatch: # 수동 실행
 
 jobs:

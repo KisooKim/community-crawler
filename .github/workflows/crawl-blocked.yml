@@ -2,7 +2,7 @@ name: Crawl Blocked Sites
 
 on:
   schedule:
-    - cron: "30 */2 * * *" # 2시간마다 (메인 크롤링 30분 후)
+    - cron: "0 * * * *" # 1시간마다
   workflow_dispatch: # 수동 실행
 
 jobs:
