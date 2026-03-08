@@ -14,9 +14,7 @@ from crawlers.todayhumor import TodayhumorCrawler
 from crawlers.natepann import NatepannCrawler
 from crawlers.bobaedream import BobaedreamCrawler
 from crawlers.dcinside import DcinsideCrawler
-from crawlers.mlbpark import MlbparkCrawler
 from crawlers.inven import InvenCrawler
-from crawlers.slrclub import SlrclubCrawler
 from crawlers.orbi import OrbiCrawler
 from crawlers.cook82 import Cook82Crawler
 
@@ -41,6 +39,16 @@ def _get_blocked_crawlers() -> dict:
         result["coinpan"] = CoinpanCrawler
     except ImportError:
         pass
+    try:
+        from crawlers.mlbpark import MlbparkCrawler
+        result["mlbpark"] = MlbparkCrawler
+    except ImportError:
+        pass
+    try:
+        from crawlers.slrclub import SlrclubCrawler
+        result["slrclub"] = SlrclubCrawler
+    except ImportError:
+        pass
     return result
 
 
@@ -56,16 +64,14 @@ class CrawlerService:
         "natepann": NatepannCrawler,
         "bobaedream": BobaedreamCrawler,
         "dcinside": DcinsideCrawler,
-        "mlbpark": MlbparkCrawler,
         "inven": InvenCrawler,
-        "slrclub": SlrclubCrawler,
         "orbi": OrbiCrawler,
         "cook82": Cook82Crawler,
         **_get_blocked_crawlers(),
     }
 
     # 데이터센터 IP에서 차단되는 사이트 (self-hosted runner 전용)
-    BLOCKED_SITES = {"fmkorea", "arcalive", "coinpan"}
+    BLOCKED_SITES = {"fmkorea", "arcalive", "coinpan", "mlbpark", "slrclub"}
 
     def __init__(self, db: Session = None):
         self.db = db
