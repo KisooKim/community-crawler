@@ -80,20 +80,27 @@ class ImageService:
         except Exception:
             return None
 
-    def upload_to_storage(self, data: bytes, storage_key: str,
-                          supabase_url: str, service_role_key: str,
-                          content_type: str = "image/webp") -> bool:
-        """Supabase Storage에 이미지 업로드"""
+    def upload_to_r2(self, data: bytes, storage_key: str,
+                     account_id: str, access_key_id: str, secret_access_key: str,
+                     bucket_name: str, content_type: str = "image/webp") -> bool:
+        """Cloudflare R2에 이미지 업로드 (S3-compatible API)"""
         try:
-            url = f"{supabase_url}/storage/v1/object/trend-images/{storage_key}"
-            with httpx.Client(timeout=30.0) as client:
-                resp = client.post(url, content=data, headers={
-                    "Authorization": f"Bearer {service_role_key}",
-                    "Content-Type": content_type,
-                    "x-upsert": "true",
-                })
-                resp.raise_for_status()
-                return True
+            import boto3
+            from botocore.config import Config
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+                aws_access_key_id=access_key_id,
+                aws_secret_access_key=secret_access_key,
+                config=Config(signature_version="s3v4"),
+            )
+            s3.put_object(
+                Bucket=bucket_name,
+                Key=storage_key,
+                Body=data,
+                ContentType=content_type,
+            )
+            return True
         except Exception:
             return False
 

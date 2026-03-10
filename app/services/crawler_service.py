@@ -79,8 +79,10 @@ class CrawlerService:
         self.image_service = ImageService()
         from app.core.config import get_settings
         settings = get_settings()
-        self.supabase_url = settings.supabase_url
-        self.supabase_service_role_key = settings.supabase_service_role_key
+        self.r2_account_id = settings.r2_account_id
+        self.r2_access_key_id = settings.r2_access_key_id
+        self.r2_secret_access_key = settings.r2_secret_access_key
+        self.r2_bucket_name = settings.r2_bucket_name
 
     def get_or_create_site(self, crawler) -> Site:
         """사이트 정보 조회 또는 생성"""
@@ -315,32 +317,37 @@ class CrawlerService:
             media_type = img_result.get("media_type", "image")
             hash_prefix = (img_result.get("phash") or "nohash")[:8]
 
+            r2_ready = bool(self.r2_account_id and self.r2_access_key_id and
+                            self.r2_secret_access_key and self.r2_bucket_name)
+
             if media_type == "video" and img_result.get("raw_data"):
                 # 비디오 → 원본 MP4 업로드
-                if self.supabase_url and self.supabase_service_role_key:
+                if r2_ready:
                     storage_key = f"{now.year}/{now.month:02d}/{now.day:02d}/{trend.id}_{i}_{hash_prefix}.mp4"
-                    if not self.image_service.upload_to_storage(
+                    if not self.image_service.upload_to_r2(
                         img_result["raw_data"], storage_key,
-                        self.supabase_url, self.supabase_service_role_key,
-                        content_type="video/mp4",
+                        self.r2_account_id, self.r2_access_key_id, self.r2_secret_access_key,
+                        self.r2_bucket_name, content_type="video/mp4",
                     ):
                         storage_key = None
             elif img_result.get("is_gif") and img_result.get("raw_data"):
                 # 애니메이션 GIF → 원본 그대로 업로드
-                if self.supabase_url and self.supabase_service_role_key:
+                if r2_ready:
                     storage_key = f"{now.year}/{now.month:02d}/{now.day:02d}/{trend.id}_{i}_{hash_prefix}.gif"
-                    if not self.image_service.upload_to_storage(
+                    if not self.image_service.upload_to_r2(
                         img_result["raw_data"], storage_key,
-                        self.supabase_url, self.supabase_service_role_key,
-                        content_type="image/gif",
+                        self.r2_account_id, self.r2_access_key_id, self.r2_secret_access_key,
+                        self.r2_bucket_name, content_type="image/gif",
                     ):
                         storage_key = None
             else:
                 webp_data = img_result.get("webp_data")
-                if webp_data and self.supabase_url and self.supabase_service_role_key:
+                if webp_data and r2_ready:
                     storage_key = f"{now.year}/{now.month:02d}/{now.day:02d}/{trend.id}_{i}_{hash_prefix}.webp"
-                    if not self.image_service.upload_to_storage(
-                        webp_data, storage_key, self.supabase_url, self.supabase_service_role_key
+                    if not self.image_service.upload_to_r2(
+                        webp_data, storage_key,
+                        self.r2_account_id, self.r2_access_key_id, self.r2_secret_access_key,
+                        self.r2_bucket_name,
                     ):
                         storage_key = None
 

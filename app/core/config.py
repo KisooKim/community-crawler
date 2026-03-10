@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_role_key: str = ""
 
+    # Cloudflare R2
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket_name: str = ""
+
     # CORS
     allowed_origins: list[str] = ["http://localhost:3000"]
 
