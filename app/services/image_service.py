@@ -4,11 +4,15 @@ import httpx
 import imagehash
 from PIL import Image
 
+# 거대 이미지 (decompression bomb) 차단: 50MP 초과 시 예외 발생
+Image.MAX_IMAGE_PIXELS = 50_000_000
+
 
 class ImageService:
     """이미지 처리 서비스 (pHash 계산만, 저장 안 함)"""
 
     HASH_THRESHOLD = 10  # 해밍 거리 임계값
+    MAX_DOWNLOAD_SIZE = 20 * 1024 * 1024  # 20MB — 너무 큰 이미지 다운로드 차단
 
     def download_image(self, url: str, referer: str | None = None) -> bytes | None:
         """이미지 다운로드 (pHash 계산용, 메모리에서만 사용)"""
@@ -19,6 +23,8 @@ class ImageService:
             with httpx.Client(timeout=15.0, headers=headers) as client:
                 response = client.get(url)
                 response.raise_for_status()
+                if len(response.content) > self.MAX_DOWNLOAD_SIZE:
+                    return None
                 return response.content
         except Exception:
             return None
