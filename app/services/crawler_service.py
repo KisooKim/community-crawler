@@ -6,7 +6,6 @@ from sqlalchemy import select
 from app.models.trend import Site, TrendArticle
 from app.services.trend_service import TrendService
 from app.services.image_service import ImageService
-from crawlers.clien import ClienCrawler
 from crawlers.theqoo import TheqooCrawler
 from crawlers.ppomppu import PpomppuCrawler
 from crawlers.instiz import InstizCrawler
@@ -56,7 +55,7 @@ class CrawlerService:
     """크롤링 서비스"""
 
     CRAWLERS = {
-        "clien": ClienCrawler,
+        # "clien": ClienCrawler,  # 추천글 기능 일시 중단 (2026-03-12~)
         "theqoo": TheqooCrawler,
         "ppomppu": PpomppuCrawler,
         "instiz": InstizCrawler,
