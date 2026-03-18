@@ -18,24 +18,31 @@ class MlbparkCrawler(BaseCrawler):
     def base_url(self) -> str:
         return "https://mlbpark.donga.com"
 
-    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
-        """TODAY BEST 인기글 수집"""
-        articles = []
-        url = f"{self.base_url}/mp/best.php?b=bullpen"
-        soup = self.fetch_html(url)
+    # 최다추천 / 최고조회 / 최다댓글
+    BEST_SORTS = ["like", "view", "reply"]
 
-        rows = soup.select("table.tbl_type01 tbody tr")
-        for row in rows:
-            try:
-                article = self._parse_row(row, skip_urls)
-                if article:
-                    articles.append(article)
-            except Exception:
-                continue
+    def get_popular_articles(self, skip_urls: set[str] | None = None) -> list[ArticleData]:
+        """TODAY BEST 인기글 수집 (최다추천 + 최고조회 + 최다댓글, 중복 제거)"""
+        seen_urls: set[str] = set()
+        articles = []
+
+        for sort in self.BEST_SORTS:
+            url = f"{self.base_url}/mp/best.php?b=bullpen&m={sort}"
+            soup = self.fetch_html(url, delay=(sort != self.BEST_SORTS[0]))
+
+            rows = soup.select("table.tbl_type01 tbody tr")
+            for row in rows:
+                try:
+                    article = self._parse_row(row, skip_urls, seen_urls)
+                    if article:
+                        seen_urls.add(article.url)
+                        articles.append(article)
+                except Exception:
+                    continue
 
         return articles
 
-    def _parse_row(self, row, skip_urls: set[str] | None = None) -> ArticleData | None:
+    def _parse_row(self, row, skip_urls: set[str] | None = None, seen_urls: set[str] | None = None) -> ArticleData | None:
         title_link = row.select_one("a.txt")
         if not title_link:
             return None
@@ -55,6 +62,8 @@ class MlbparkCrawler(BaseCrawler):
         href = urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
 
         if skip_urls and href in skip_urls:
+            return None
+        if seen_urls and href in seen_urls:
             return None
 
         # best.php doesn't show engagement on list — get from detail page
