@@ -1,7 +1,7 @@
 import math
 import re
 from datetime import datetime, timedelta
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, text
 from sqlalchemy.orm import Session
 
 from app.models.trend import Trend, TrendImage, TrendArticle
@@ -35,17 +35,26 @@ class TrendService:
     def find_or_create_trend(self, image_phash: str, title: str) -> Trend:
         """유사한 트렌드 찾기 또는 새로 생성"""
         cutoff = datetime.utcnow() - timedelta(hours=self.MATCH_WINDOW_HOURS)
-        existing_images = self.db.execute(
-            select(TrendImage).where(
-                TrendImage.phash.isnot(None),
-                TrendImage.created_at > cutoff,
-            )
-        ).scalars().all()
 
-        for img in existing_images:
-            if self.image_service.is_similar(image_phash, img.phash):
-                if self._title_similar(title, img.trend.title):
-                    return img.trend
+        # DB에서 해밍 거리 직접 계산 → 매칭되는 이미지만 반환 (egress 절감)
+        rows = self.db.execute(
+            text("""
+                SELECT ti.id, ti.trend_id, ti.phash, t.title AS trend_title
+                FROM trend_images ti
+                JOIN trends t ON t.id = ti.trend_id
+                WHERE ti.phash IS NOT NULL
+                  AND ti.created_at > :cutoff
+                  AND bit_count(('x' || ti.phash)::bit(64) # ('x' || :input_phash)::bit(64)) <= :threshold
+            """),
+            {"cutoff": cutoff, "input_phash": image_phash,
+             "threshold": ImageService.HASH_THRESHOLD},
+        ).all()
+
+        for row in rows:
+            if self._title_similar(title, row.trend_title):
+                trend = self.db.get(Trend, row.trend_id)
+                if trend:
+                    return trend
 
         # 새 트렌드 생성
         trend = Trend(title=title, score=1.0, site_count=1)
@@ -113,17 +122,23 @@ class TrendService:
                 existing.storage_key = image_data["storage_key"]
             return existing
 
-        # pHash 유사도 체크 (같은 이미지, 다른 URL/압축)
+        # pHash 유사도 체크 (같은 이미지, 다른 URL/압축) — DB에서 해밍 거리 계산
         phash = image_data.get("phash")
         if phash:
-            existing_images = self.db.execute(
-                select(TrendImage).where(
-                    TrendImage.trend_id == trend.id,
-                    TrendImage.phash.isnot(None),
-                )
-            ).scalars().all()
-            for existing_img in existing_images:
-                if self.image_service.is_similar(phash, existing_img.phash):
+            match = self.db.execute(
+                text("""
+                    SELECT id FROM trend_images
+                    WHERE trend_id = :trend_id
+                      AND phash IS NOT NULL
+                      AND bit_count(('x' || phash)::bit(64) # ('x' || :input_phash)::bit(64)) <= :threshold
+                    LIMIT 1
+                """),
+                {"trend_id": trend.id, "input_phash": phash,
+                 "threshold": ImageService.HASH_THRESHOLD},
+            ).first()
+            if match:
+                existing_img = self.db.get(TrendImage, match.id)
+                if existing_img:
                     if not existing_img.storage_key and image_data.get("storage_key"):
                         existing_img.storage_key = image_data["storage_key"]
                     return existing_img
