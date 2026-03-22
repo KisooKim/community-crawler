@@ -42,9 +42,10 @@ class InstizCrawler(BaseCrawler):
         title = title_el.get_text(strip=True)
         href = link.get("href", "")
 
-        # 조회수, 추천수
+        # 조회수, 추천수, 날짜
         view_count = 0
         like_count = 0
+        published_at = None
         for span in link.select("span.minitext3"):
             text = span.get_text(strip=True)
             view_match = re.search(r"조회\s+([\d,]+)", text)
@@ -53,6 +54,8 @@ class InstizCrawler(BaseCrawler):
             like_match = re.search(r"추천\s+([\d,]+)", text)
             if like_match:
                 like_count = int(like_match.group(1).replace(",", ""))
+            if not published_at and not view_match and not like_match:
+                published_at = self._parse_date(text)
 
         comment_count = 0
         cmt = link.select_one("span.cmt2")
@@ -89,6 +92,7 @@ class InstizCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
     def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:

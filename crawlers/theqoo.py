@@ -72,6 +72,11 @@ class TheqooCrawler(BaseCrawler):
             if numbers:
                 comment_count = int(numbers[0])
 
+        published_at = None
+        time_td = row.select_one("td.time")
+        if time_td:
+            published_at = self._parse_date(time_td.get_text(strip=True))
+
         images, video_urls, like_count = self._get_article_detail(href)
 
         return ArticleData(
@@ -82,6 +87,7 @@ class TheqooCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
     def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int]:

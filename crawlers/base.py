@@ -1,7 +1,8 @@
 import logging
+import re as _re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import time
 import random
 import httpx
@@ -122,6 +123,83 @@ class BaseCrawler(ABC):
                     f"giving up after {self.MAX_RETRIES} retries"
                 )
                 response.raise_for_status()
+
+    # ── Date parsing ──────────────────────────────────────────────────────
+    KST = timezone(timedelta(hours=9))
+
+    _RELATIVE_RE = _re.compile(r"(\d+)\s*(초|분|시간|일|개월|달)\s*전")
+    _RELATIVE_UNITS = {"초": "seconds", "분": "minutes", "시간": "hours", "일": "days", "개월": "days", "달": "days"}
+    _RELATIVE_MULTIPLIERS = {"초": 1, "분": 1, "시간": 1, "일": 1, "개월": 30, "달": 30}
+
+    _DATE_PATTERNS = [
+        (_re.compile(r"(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?"), True),
+        (_re.compile(r"(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})"), False),
+        (_re.compile(r"(\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})$"), False),
+        (_re.compile(r"(\d{1,2})[.\-/](\d{1,2})\s+(\d{1,2}):(\d{2})"), True),
+        (_re.compile(r"^(\d{1,2})[.\-/](\d{1,2})$"), False),
+        (_re.compile(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?$"), True),
+    ]
+
+    @classmethod
+    def _parse_date(cls, text: str) -> datetime | None:
+        if not text:
+            return None
+        text = text.strip()
+        now_kst = datetime.now(cls.KST)
+
+        if text in ("방금", "방금전", "방금 전"):
+            return now_kst.astimezone(timezone.utc).replace(tzinfo=None)
+
+        m = cls._RELATIVE_RE.search(text)
+        if m:
+            amount = int(m.group(1))
+            unit_kr = m.group(2)
+            unit = cls._RELATIVE_UNITS.get(unit_kr, "hours")
+            mult = cls._RELATIVE_MULTIPLIERS.get(unit_kr, 1)
+            delta = timedelta(**{unit: amount * mult})
+            dt = now_kst - delta
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+        for pattern, has_time in cls._DATE_PATTERNS:
+            m = pattern.search(text)
+            if not m:
+                continue
+            groups = m.groups()
+
+            if len(groups) >= 5:
+                y, mo, d, h, mi = int(groups[0]), int(groups[1]), int(groups[2]), int(groups[3]), int(groups[4])
+                s = int(groups[5]) if len(groups) > 5 and groups[5] else 0
+            elif len(groups) == 4 and has_time:
+                y = now_kst.year
+                mo, d, h, mi, s = int(groups[0]), int(groups[1]), int(groups[2]), int(groups[3]), 0
+                if mo > now_kst.month or (mo == now_kst.month and d > now_kst.day):
+                    y -= 1
+            elif len(groups) == 3 and not has_time:
+                y, mo, d = int(groups[0]), int(groups[1]), int(groups[2])
+                h, mi, s = 12, 0, 0
+            elif len(groups) in (2, 3) and has_time and len(groups) <= 3:
+                y, mo, d = now_kst.year, now_kst.month, now_kst.day
+                h, mi = int(groups[0]), int(groups[1])
+                s = int(groups[2]) if len(groups) > 2 and groups[2] else 0
+            elif len(groups) == 2 and not has_time:
+                y = now_kst.year
+                mo, d = int(groups[0]), int(groups[1])
+                h, mi, s = 12, 0, 0
+                if mo > now_kst.month or (mo == now_kst.month and d > now_kst.day):
+                    y -= 1
+            else:
+                continue
+
+            if y < 100:
+                y += 2000
+
+            try:
+                dt = datetime(y, mo, d, h, mi, s, tzinfo=cls.KST)
+                return dt.astimezone(timezone.utc).replace(tzinfo=None)
+            except ValueError:
+                continue
+
+        return None
 
     def _extract_videos(self, content) -> list[str]:
         """본문에서 <video> 태그의 MP4/WebM URL 추출"""

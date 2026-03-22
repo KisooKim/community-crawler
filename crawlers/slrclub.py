@@ -109,12 +109,18 @@ class SlrclubCrawler(BaseCrawler):
         if comment_match:
             comment_count = int(comment_match.group(1))
 
+        published_at = None
+        date_td = row.select_one("td.list_date")
+        if date_td:
+            published_at = self._parse_date(date_td.get_text(strip=True))
+
         return {
             "title": title,
             "url": href,
             "view_count": view_count,
             "like_count": like_count,
             "comment_count": comment_count,
+            "published_at": published_at,
         }
 
     def _build_article(self, info: dict, page) -> ArticleData | None:
@@ -129,6 +135,7 @@ class SlrclubCrawler(BaseCrawler):
             view_count=info["view_count"],
             like_count=info["like_count"],
             comment_count=info["comment_count"],
+            published_at=info.get("published_at"),
         )
 
     def _get_article_detail(self, url: str, page) -> tuple[list[str], list[str]]:

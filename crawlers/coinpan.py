@@ -2,7 +2,7 @@ import re
 import time
 import random
 import logging
-from crawlers.base import ArticleData
+from crawlers.base import ArticleData, BaseCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +97,11 @@ class CoinpanCrawler:
             if nums:
                 comment_count = int(nums[0])
 
+        published_at = None
+        date_cells = row.css("td.regdate")
+        if date_cells:
+            published_at = BaseCrawler._parse_date(date_cells[0].get_all_text(strip=True))
+
         image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
@@ -107,6 +112,7 @@ class CoinpanCrawler:
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
     def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:

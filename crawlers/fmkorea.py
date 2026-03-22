@@ -96,11 +96,17 @@ class FmKoreaCrawler(BaseCrawler):
         if cm:
             comment_count = int(cm.group(1))
 
+        published_at = None
+        date_el = item.select_one(".regdate")
+        if date_el:
+            published_at = self._parse_date(date_el.get_text(strip=True))
+
         return {
             "title": title,
             "url": href,
             "like_count": like_count,
             "comment_count": comment_count,
+            "published_at": published_at,
         }
 
     def _build_article(self, info: dict, page) -> ArticleData | None:
@@ -115,6 +121,7 @@ class FmKoreaCrawler(BaseCrawler):
             view_count=view_count,
             like_count=info["like_count"],
             comment_count=info["comment_count"],
+            published_at=info.get("published_at"),
         )
 
     def _get_article_detail(self, url: str, page) -> tuple[list[str], list[str], int]:

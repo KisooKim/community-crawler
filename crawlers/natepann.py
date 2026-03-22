@@ -72,7 +72,7 @@ class NatepannCrawler(BaseCrawler):
         # Check for thumbnail
         has_thumb = bool(item.select_one("div.thumb img"))
 
-        image_urls, video_urls = self._get_article_images(href)
+        image_urls, video_urls, published_at = self._get_article_images(href)
 
         # Skip if no images at all
         if not image_urls and not has_thumb:
@@ -86,15 +86,22 @@ class NatepannCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
-    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str], "datetime | None"]:
         try:
             soup = self.fetch_html(url)
+
+            published_at = None
+            date_el = soup.select_one("span.date")
+            if date_el:
+                published_at = self._parse_date(date_el.get_text(strip=True))
+
             images = []
             content = soup.select_one("div#contentArea")
             if not content:
-                return [], []
+                return [], [], published_at
 
             for img in content.select("img"):
                 src = img.get("src") or img.get("data-src")
@@ -104,9 +111,9 @@ class NatepannCrawler(BaseCrawler):
                     images.append(src)
 
             videos = self._extract_videos(content)
-            return images[:50], videos
+            return images[:50], videos, published_at
         except Exception:
-            return [], []
+            return [], [], None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank", "loading"]

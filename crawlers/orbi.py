@@ -68,6 +68,11 @@ class OrbiCrawler(BaseCrawler):
             if nums:
                 comment_count = int(nums[0])
 
+        published_at = None
+        date_el = item.select_one("span.date")
+        if date_el:
+            published_at = self._parse_date(date_el.get_text(strip=True))
+
         images, video_urls, view_count = self._get_article_detail(href)
 
         return ArticleData(
@@ -78,6 +83,7 @@ class OrbiCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
     def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int]:

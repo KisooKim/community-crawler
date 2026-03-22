@@ -104,6 +104,11 @@ class ArcaliveCrawler(BaseCrawler):
             if nums:
                 comment_count = int(nums[0])
 
+        published_at = None
+        time_el = row.select_one(".col-time")
+        if time_el:
+            published_at = self._parse_date(time_el.get_text(strip=True))
+
         return ArticleData(
             title=title,
             url=href,
@@ -111,4 +116,5 @@ class ArcaliveCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )

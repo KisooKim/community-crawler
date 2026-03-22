@@ -74,9 +74,11 @@ class PpomppuCrawler(BaseCrawler):
 
         view_count = 0
         like_count = 0
+        published_at = None
         # td.board_date: [0]=시간, [1]=추천-반대, [2]=조회수
         date_tds = row.select("td.board_date")
         if len(date_tds) >= 3:
+            published_at = self._parse_date(date_tds[0].get_text(strip=True))
             nums = re.findall(r"\d+", date_tds[-1].get_text(strip=True).replace(",", ""))
             if nums:
                 view_count = int(nums[0])
@@ -102,6 +104,7 @@ class PpomppuCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
     def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:

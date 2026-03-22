@@ -76,6 +76,11 @@ class InvenCrawler(BaseCrawler):
             if nums:
                 comment_count = int(nums[0])
 
+        published_at = None
+        date_td = row.select_one("td.date")
+        if date_td:
+            published_at = self._parse_date(date_td.get_text(strip=True))
+
         image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
@@ -86,6 +91,7 @@ class InvenCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
     def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:

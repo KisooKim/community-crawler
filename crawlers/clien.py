@@ -68,6 +68,11 @@ class ClienCrawler(BaseCrawler):
         if reply_el:
             comment_count = self._parse_count(reply_el.get_text(strip=True))
 
+        published_at = None
+        time_el = item.select_one(".list_time .timestamp")
+        if time_el:
+            published_at = self._parse_date(time_el.get_text(strip=True))
+
         image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
@@ -78,6 +83,7 @@ class ClienCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
     def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:

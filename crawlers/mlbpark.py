@@ -67,7 +67,7 @@ class MlbparkCrawler(BaseCrawler):
             return None
 
         # best.php doesn't show engagement on list — get from detail page
-        images, video_urls, like_count, view_count, comment_count = self._get_article_detail(href)
+        images, video_urls, like_count, view_count, comment_count, published_at = self._get_article_detail(href)
 
         return ArticleData(
             title=title,
@@ -77,12 +77,18 @@ class MlbparkCrawler(BaseCrawler):
             view_count=view_count,
             like_count=like_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
-    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int, int, int]:
-        """상세 페이지에서 이미지 + 비디오 + 추천수 + 조회수 + 댓글수 추출"""
+    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int, int, int, "datetime | None"]:
+        """상세 페이지에서 이미지 + 비디오 + 추천수 + 조회수 + 댓글수 + 날짜 추출"""
         try:
             soup = self.fetch_html(url)
+
+            published_at = None
+            text1_div = soup.select_one("div.text1")
+            if text1_div:
+                published_at = self._parse_date(text1_div.get_text(strip=True))
 
             # div.text2: 추천 203 조회 38,179 댓글 N
             like_count = 0
@@ -124,9 +130,9 @@ class MlbparkCrawler(BaseCrawler):
                         images.append(src)
 
             videos = self._extract_videos(content) if content else []
-            return images[:50], videos, like_count, view_count, comment_count
+            return images[:50], videos, like_count, view_count, comment_count, published_at
         except Exception:
-            return [], [], 0, 0, 0
+            return [], [], 0, 0, 0, None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank", "loading"]

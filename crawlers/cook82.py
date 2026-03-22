@@ -71,6 +71,11 @@ class Cook82Crawler(BaseCrawler):
             if nums:
                 comment_count = int(nums[0])
 
+        published_at = None
+        date_tds = row.select("td.numbers")
+        if len(date_tds) >= 2:
+            published_at = self._parse_date(date_tds[0].get_text(strip=True))
+
         image_urls, video_urls = self._get_article_images(href)
 
         return ArticleData(
@@ -80,6 +85,7 @@ class Cook82Crawler(BaseCrawler):
             video_urls=video_urls,
             view_count=view_count,
             comment_count=comment_count,
+            published_at=published_at,
         )
 
     def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
