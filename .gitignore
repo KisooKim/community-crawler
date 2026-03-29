@@ -1,0 +1,47 @@
+# Data files
+*.csv
+*.dta
+*.rds
+*.rda
+*.RData
+*.sav
+*.parquet
+*.feather
+*.xlsx
+*.xls
+*.sqlite
+*.db
+*.zip
+*.tar.gz
+*.gz
+
+# R
+.Rhistory
+.Rproj.user/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Node
+node_modules/
+
+# Build
+build/
+dist/
+DerivedData/
+
+# Stata
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large output
+*.pdf
+*.png
+*.jpg
+*.jpeg
