@@ -1,0 +1,13 @@
+sqlalchemy
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+beautifulsoup4
+lxml
+imagehash
+Pillow
+psycopg2-binary
+asyncpg
+greenlet
+boto3

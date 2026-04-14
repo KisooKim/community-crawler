@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -113,8 +114,13 @@ class CrawlerService:
             referer = crawler.base_url
 
             # 기존 URL을 전달하여 상세 페이지 방문 스킵 (FmKorea 등)
+            # 최근 7일만 조회 — 리스트 페이지에 7일 넘은 글은 거의 안 나타남
+            recent_cutoff = datetime.utcnow() - timedelta(days=7)
             existing = self.db.execute(
-                select(TrendArticle.url).where(TrendArticle.site_id == site.id)
+                select(TrendArticle.url).where(
+                    TrendArticle.site_id == site.id,
+                    TrendArticle.created_at > recent_cutoff,
+                )
             ).all()
             skip_urls = set(row[0] for row in existing)
 
@@ -232,12 +238,14 @@ class CrawlerService:
         Returns: {article_url: [result_dict, ...]} 매핑
         """
         # (article_url, index, url, media_type) 튜플 리스트
+        # 기사당 최대 10장 이미지 + 5개 비디오. 대표 이미지는 앞쪽에 있고,
+        # 50장까지 다운받던 기존 설정은 네트워크 시간 낭비가 컸음.
         tasks = []
         for article in articles:
-            for i, img_url in enumerate(article.image_urls[:50]):
+            for i, img_url in enumerate(article.image_urls[:10]):
                 tasks.append((article.url, i, img_url, "image"))
             # 비디오는 이미지 뒤에 붙임
-            offset = len(article.image_urls[:50])
+            offset = len(article.image_urls[:10])
             for j, vid_url in enumerate(article.video_urls[:5]):
                 tasks.append((article.url, offset + j, vid_url, "video"))
 

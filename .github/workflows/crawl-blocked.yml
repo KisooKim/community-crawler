@@ -39,11 +39,6 @@ jobs:
           )
 
           log('importing modules...')
-          import app.models.trend
-          from app.core.database import Base, sync_engine
-          log('creating tables...')
-          Base.metadata.create_all(sync_engine)
-          log('importing crawlers...')
           from app.services.crawler_service import CrawlerService
           from app.core.database import SyncSessionLocal
           log('starting crawl...')
@@ -64,10 +59,4 @@ jobs:
               name = r.get('site', 'unknown')
               count = r.get('processed', 0)
               print(f'{status} {name}: {count} articles')
-
-          from app.core.database import get_sync_db
-          from app.services.trend_service import TrendService
-          with get_sync_db() as db:
-              updated = TrendService(db).update_scores()
-              print(f'Updated scores for {updated} trends')
           "
