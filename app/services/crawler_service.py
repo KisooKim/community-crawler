@@ -8,6 +8,7 @@ from app.models.trend import Site, TrendArticle
 from app.services.trend_service import TrendService
 from app.services.image_service import ImageService
 from crawlers.theqoo import TheqooCrawler
+from crawlers.ruliweb import RuliwebCrawler
 from crawlers.ppomppu import PpomppuCrawler
 from crawlers.instiz import InstizCrawler
 from crawlers.todayhumor import TodayhumorCrawler
@@ -58,6 +59,7 @@ class CrawlerService:
     CRAWLERS = {
         # "clien": ClienCrawler,  # 추천글 기능 일시 중단 (2026-03-12~)
         "theqoo": TheqooCrawler,
+        "ruliweb": RuliwebCrawler,  # 재추가 2026-05-24: memekase 비교 후 짤 확산 핵심 노드로 판단
         "ppomppu": PpomppuCrawler,
         "instiz": InstizCrawler,
         "todayhumor": TodayhumorCrawler,
