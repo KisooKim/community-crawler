@@ -11,7 +11,7 @@ Image.MAX_IMAGE_PIXELS = 50_000_000
 class ImageService:
     """이미지 처리 서비스 (pHash 계산만, 저장 안 함)"""
 
-    HASH_THRESHOLD = 10  # 해밍 거리 임계값
+    HASH_THRESHOLD = 12  # 해밍 거리 임계값
     MAX_DOWNLOAD_SIZE = 20 * 1024 * 1024  # 20MB — 너무 큰 이미지 다운로드 차단
 
     def download_image(self, url: str, referer: str | None = None) -> bytes | None:

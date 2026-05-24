@@ -18,13 +18,13 @@ class TrendService:
         self.image_service = ImageService()
         self._site_stats_cache = None
 
-    MATCH_WINDOW_HOURS = 72  # 최근 3일 이미지만 비교
+    MATCH_WINDOW_HOURS = 168  # 최근 7일 이미지만 비교
 
-    MIN_OVERLAP_WORDS = 2  # 제목 매칭 최소 겹침 단어 수
+    MIN_OVERLAP_WORDS = 1  # 제목 매칭 최소 겹침 단어 수 (이미지 phash ≤ HASH_THRESHOLD 통과한 페어에만 적용)
 
     @staticmethod
     def _title_similar(title1: str, title2: str) -> bool:
-        """두 제목의 유사도 확인 (2글자 이상 단어 겹침 기반, 최소 2개 겹침)"""
+        """두 제목의 유사도 확인 (2글자 이상 단어 겹침 기반, 최소 1개 겹침)"""
         words1 = set(w for w in re.split(r'\W+', title1) if len(w) >= 2)
         words2 = set(w for w in re.split(r'\W+', title2) if len(w) >= 2)
         if not words1 or not words2:
