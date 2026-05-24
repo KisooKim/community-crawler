@@ -9,6 +9,7 @@ from app.services.trend_service import TrendService
 from app.services.image_service import ImageService
 from crawlers.theqoo import TheqooCrawler
 from crawlers.ruliweb import RuliwebCrawler
+from crawlers.dogdrip import DogdripCrawler
 from crawlers.ppomppu import PpomppuCrawler
 from crawlers.instiz import InstizCrawler
 from crawlers.todayhumor import TodayhumorCrawler
@@ -60,6 +61,7 @@ class CrawlerService:
         # "clien": ClienCrawler,  # 추천글 기능 일시 중단 (2026-03-12~)
         "theqoo": TheqooCrawler,
         "ruliweb": RuliwebCrawler,  # 재추가 2026-05-24: memekase 비교 후 짤 확산 핵심 노드로 판단
+        "dogdrip": DogdripCrawler,  # 추가 2026-05-24: memekase가 "밈 확산 허브"로 분류
         "ppomppu": PpomppuCrawler,
         "instiz": InstizCrawler,
         "todayhumor": TodayhumorCrawler,
