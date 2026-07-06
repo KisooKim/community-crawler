@@ -1,8 +1,9 @@
 import math
 import re
 from datetime import datetime, timedelta
+from collections import defaultdict
 from sqlalchemy import select, update, func, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.trend import Trend, TrendImage, TrendArticle
 from app.services.image_service import ImageService
@@ -11,7 +12,11 @@ from app.services.image_service import ImageService
 class TrendService:
     """트렌드 관리 서비스"""
 
-    HALF_LIFE_HOURS = 4  # 점수 반감기 (시간)
+    # 점수 반감기 (시간). 4h→8h 완화 (2026-07-06 P1: 노출 풀 전원이 <20h로
+    # 재고가 체류 상한이던 문제 — 풀 수명을 늘려 재고 확보).
+    # 주의: update_scores()의 갱신 윈도우(72h)와 연동 — 반감기를 더 늘리면
+    # 윈도우 밖에서 score>0.5로 얼어붙는 트렌드가 생기지 않는지 확인할 것.
+    HALF_LIFE_HOURS = 8
 
     def __init__(self, db: Session = None):
         self.db = db
@@ -234,17 +239,64 @@ class TrendService:
         trend.score = self.calculate_score(trend)
         trend.updated_at = datetime.utcnow()
 
+    # 순위 기반 누적 다양성 페널티: 1위부터 순서대로 확정하며, 같은 사이트/
+    # 카테고리가 위에 k번 등장했으면 adjusted = original × decay^min(k, CAP).
+    # 점수가 압도적이면 페널티를 이기고 올라오므로 재밌는 글은 묻히지 않음.
+    SITE_DIVERSITY_DECAY = 0.85      # 사이트 등장 1회당 (0.85^3=61%)
+    CATEGORY_DIVERSITY_DECAY = 0.90  # 카테고리 등장 1회당 — 사이트보다 완만 (0.90^7=48%)
+    # 페널티 지수 상한. 목적은 상위권 다양성이지 꼬리 절멸이 아님 — 무제한
+    # 누적이면 다수 사이트(fmkorea 등)의 30번째 트렌드가 ×0.009로 뭉개져
+    # 노출 풀이 오히려 줄어듦 (2026-07-06 시뮬: 무제한 46 vs cap=6 78).
+    # 바닥: site 0.85^6=0.38, category 0.90^6=0.53.
+    DIVERSITY_PENALTY_CAP = 6
+
+    def _apply_rank_diversity(self, trends: list[Trend]):
+        """순위 기반 누적 사이트·카테고리 다양성 페널티.
+
+        원본 점수 순으로 훑으며, 해당 트렌드의 primary site가 위에 k_s번,
+        category(LLM 분류, 미분류 None은 집계 제외)가 k_c번 등장했으면
+        score *= SITE_DECAY^min(k_s,CAP) × CATEGORY_DECAY^min(k_c,CAP).
+        """
+        sorted_trends = sorted(trends, key=lambda t: t.score, reverse=True)
+        site_counts: dict[int, int] = defaultdict(int)
+        category_counts: dict[str, int] = defaultdict(int)
+
+        for trend in sorted_trends:
+            penalty = 1.0
+
+            if trend.articles:
+                primary_site = trend.articles[0].site_id
+                k = min(site_counts[primary_site], self.DIVERSITY_PENALTY_CAP)
+                if k > 0:
+                    penalty *= self.SITE_DIVERSITY_DECAY ** k
+                site_counts[primary_site] += 1
+
+            if trend.category:
+                k = min(category_counts[trend.category], self.DIVERSITY_PENALTY_CAP)
+                if k > 0:
+                    penalty *= self.CATEGORY_DIVERSITY_DECAY ** k
+                category_counts[trend.category] += 1
+
+            if penalty < 1.0:
+                trend.score *= penalty
+
     def update_scores(self) -> int:
-        """모든 트렌드 점수 업데이트 (시간 감쇠 적용)"""
-        # 최근 48시간 내 트렌드만 업데이트
-        cutoff = datetime.utcnow() - timedelta(hours=48)
+        """모든 트렌드 점수 업데이트 (시간 감쇠 + 사이트·카테고리 다양성)"""
+        # 최근 72시간 내 트렌드만 업데이트.
+        # 48h→72h: 반감기 8h 기준 base score가 커도 72h면 0.5 아래로 확실히
+        # 내려감 (48h 윈도우면 base>32인 트렌드가 score>0.5로 얼어붙어 영구 노출).
+        cutoff = datetime.utcnow() - timedelta(hours=72)
 
         trends = self.db.execute(
-            select(Trend).where(Trend.created_at > cutoff)
+            select(Trend)
+            .options(selectinload(Trend.articles))
+            .where(Trend.created_at > cutoff)
         ).scalars().all()
 
         for trend in trends:
             trend.score = self.calculate_score(trend)
+
+        self._apply_rank_diversity(trends)
 
         self.db.commit()
         return len(trends)

@@ -27,6 +27,7 @@ class Trend(Base):
     title = Column(String(500), nullable=False)
     score = Column(Float, default=0.0)
     site_count = Column(Integer, default=1)  # 발견된 사이트 수
+    category = Column(String(30))  # LLM 편집 레이어(zzalmunity enrichment)가 기록 — 여기서는 랭킹 다양성 페널티용 읽기 전용
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
