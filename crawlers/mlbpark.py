@@ -67,7 +67,7 @@ class MlbparkCrawler(BaseCrawler):
             return None
 
         # best.php doesn't show engagement on list — get from detail page
-        images, video_urls, like_count, view_count, comment_count, published_at = self._get_article_detail(href)
+        images, video_urls, like_count, view_count, comment_count, published_at, text_content = self._get_article_detail(href)
 
         return ArticleData(
             title=title,
@@ -78,9 +78,10 @@ class MlbparkCrawler(BaseCrawler):
             like_count=like_count,
             comment_count=comment_count,
             published_at=published_at,
+            content=text_content,
         )
 
-    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int, int, int, "datetime | None"]:
+    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int, int, int, "datetime | None", str | None]:
         """상세 페이지에서 이미지 + 비디오 + 추천수 + 조회수 + 댓글수 + 날짜 추출"""
         try:
             soup = self.fetch_html(url)
@@ -130,9 +131,10 @@ class MlbparkCrawler(BaseCrawler):
                         images.append(src)
 
             videos = self._extract_videos(content) if content else []
-            return images[:50], videos, like_count, view_count, comment_count, published_at
+            text_content = self._extract_text_content(content)
+            return images[:50], videos, like_count, view_count, comment_count, published_at, text_content
         except Exception:
-            return [], [], 0, 0, 0, None
+            return [], [], 0, 0, 0, None, None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank", "loading"]

@@ -62,7 +62,7 @@ class RuliwebCrawler(BaseCrawler):
             if numbers:
                 like_count = int(numbers[0])
 
-        image_urls = self._get_article_images(href)
+        image_urls, text_content = self._get_article_images(href)
 
         return ArticleData(
             title=title,
@@ -70,15 +70,16 @@ class RuliwebCrawler(BaseCrawler):
             image_urls=image_urls,
             view_count=view_count,
             like_count=like_count,
+            content=text_content,
         )
 
-    def _get_article_images(self, url: str) -> list[str]:
+    def _get_article_images(self, url: str) -> tuple[list[str], str | None]:
         try:
             soup = self.fetch_html(url)
             images = []
             content = soup.select_one(".view_content")
             if not content:
-                return []
+                return [], None
 
             for img in content.select("img"):
                 src = img.get("src") or img.get("data-src")
@@ -87,9 +88,10 @@ class RuliwebCrawler(BaseCrawler):
                         src = "https:" + src
                     images.append(src)
 
-            return images[:50]
+            text_content = self._extract_text_content(content)
+            return images[:50], text_content
         except Exception:
-            return []
+            return [], None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank"]

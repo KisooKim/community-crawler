@@ -125,7 +125,7 @@ class SlrclubCrawler(BaseCrawler):
 
     def _build_article(self, info: dict, page) -> ArticleData | None:
         """상세 페이지 방문하여 이미지/비디오 추출"""
-        image_urls, video_urls = self._get_article_detail(info["url"], page)
+        image_urls, video_urls, text_content = self._get_article_detail(info["url"], page)
 
         return ArticleData(
             title=info["title"],
@@ -136,9 +136,10 @@ class SlrclubCrawler(BaseCrawler):
             like_count=info["like_count"],
             comment_count=info["comment_count"],
             published_at=info.get("published_at"),
+            content=text_content,
         )
 
-    def _get_article_detail(self, url: str, page) -> tuple[list[str], list[str]]:
+    def _get_article_detail(self, url: str, page) -> tuple[list[str], list[str], str | None]:
         """상세 페이지에서 이미지 + 비디오 추출 (브라우저 재사용)"""
         try:
             time.sleep(random.uniform(1.0, 2.0))
@@ -148,7 +149,7 @@ class SlrclubCrawler(BaseCrawler):
             images = []
             content = soup.select_one("div#userct")
             if not content:
-                return [], []
+                return [], [], None
 
             for img in content.select("img"):
                 src = img.get("src")
@@ -160,9 +161,10 @@ class SlrclubCrawler(BaseCrawler):
                     images.append(src)
 
             videos = self._extract_videos(content)
-            return images[:50], videos
+            text_content = self._extract_text_content(content)
+            return images[:50], videos, text_content
         except Exception:
-            return [], []
+            return [], [], None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank",

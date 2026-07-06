@@ -76,7 +76,7 @@ class Cook82Crawler(BaseCrawler):
         if len(date_tds) >= 2:
             published_at = self._parse_date(date_tds[0].get_text(strip=True))
 
-        image_urls, video_urls = self._get_article_images(href)
+        image_urls, video_urls, text_content = self._get_article_images(href)
 
         return ArticleData(
             title=title,
@@ -86,15 +86,16 @@ class Cook82Crawler(BaseCrawler):
             view_count=view_count,
             comment_count=comment_count,
             published_at=published_at,
+            content=text_content,
         )
 
-    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str], str | None]:
         try:
             soup = self.fetch_html(url)
             images = []
             content = soup.select_one("#articleBody")
             if not content:
-                return [], []
+                return [], [], None
 
             for img in content.select("img"):
                 src = img.get("src")
@@ -106,9 +107,10 @@ class Cook82Crawler(BaseCrawler):
                     images.append(src)
 
             videos = self._extract_videos(content)
-            return images[:50], videos
+            text_content = self._extract_text_content(content)
+            return images[:50], videos, text_content
         except Exception:
-            return [], []
+            return [], [], None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank", "loading"]

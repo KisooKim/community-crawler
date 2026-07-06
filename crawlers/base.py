@@ -201,6 +201,76 @@ class BaseCrawler(ABC):
 
         return None
 
+    @staticmethod
+    def _extract_text_content(content_elem) -> str | None:
+        """content div에서 본문 텍스트 추출 (이미지 위치를 [IMG] 마커로 보존).
+
+        이미지 사이의 설명 텍스트를 보존하고, 이미지 위치에 [IMG] 마커를 넣어
+        원글의 이미지-텍스트 배치 구조를 보존한다.
+
+        예: "설명글\\n[IMG]\\n다음 설명\\n[IMG]\\n[IMG]\\n마무리"
+        → 텍스트-이미지 interleaving 패턴 분석 및 프론트엔드 표시에 활용
+        """
+        if not content_elem:
+            return None
+
+        from bs4 import NavigableString, Tag
+        from copy import copy
+        elem = copy(content_elem)
+
+        # 불필요한 태그 제거
+        for tag in elem.select("script, style, iframe, noscript, .signature, .og-div"):
+            tag.decompose()
+
+        # 재귀적으로 순회하며 텍스트와 [IMG] 마커를 순서대로 수집
+        parts = []
+
+        def _walk(node):
+            if isinstance(node, NavigableString):
+                text = str(node).strip()
+                if text:
+                    parts.append(text)
+                return
+            if not isinstance(node, Tag):
+                return
+            if node.name == "img":
+                parts.append("[IMG]")
+                return
+            if node.name == "video":
+                parts.append("[IMG]")  # 비디오도 미디어 마커
+                return
+            if node.name in ("br",):
+                parts.append("\n")
+                return
+            # 블록 요소는 줄바꿈 추가
+            is_block = node.name in (
+                "div", "p", "h1", "h2", "h3", "h4", "h5", "h6",
+                "li", "blockquote", "pre", "table", "tr", "td", "th",
+                "section", "article", "header", "footer", "figcaption",
+            )
+            if is_block and parts and parts[-1] != "\n":
+                parts.append("\n")
+            for child in node.children:
+                _walk(child)
+            if is_block and parts and parts[-1] != "\n":
+                parts.append("\n")
+
+        _walk(elem)
+
+        # 조합 + 정리
+        raw = "".join(parts)
+        # 연속 빈줄 정리, 앞뒤 공백
+        import re
+        result = re.sub(r'\n{3,}', '\n\n', raw).strip()
+
+        # 너무 짧으면 (5자 미만, [IMG] 마커 제외) 의미 없음
+        text_only = result.replace("[IMG]", "").strip()
+        if len(text_only) < 5 and "[IMG]" not in result:
+            return None
+
+        # 최대 3000자 (구조 마커 포함이므로 여유 확보)
+        return result[:3000] if result else None
+
     def _extract_videos(self, content) -> list[str]:
         """본문에서 <video> 태그의 MP4/WebM URL 추출"""
         videos = []

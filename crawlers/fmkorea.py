@@ -111,7 +111,7 @@ class FmKoreaCrawler(BaseCrawler):
 
     def _build_article(self, info: dict, page) -> ArticleData | None:
         """상세 페이지 방문하여 완전한 ArticleData 생성"""
-        image_urls, video_urls, view_count = self._get_article_detail(info["url"], page)
+        image_urls, video_urls, view_count, text_content = self._get_article_detail(info["url"], page)
 
         return ArticleData(
             title=info["title"],
@@ -122,9 +122,10 @@ class FmKoreaCrawler(BaseCrawler):
             like_count=info["like_count"],
             comment_count=info["comment_count"],
             published_at=info.get("published_at"),
+            content=text_content,
         )
 
-    def _get_article_detail(self, url: str, page) -> tuple[list[str], list[str], int]:
+    def _get_article_detail(self, url: str, page) -> tuple[list[str], list[str], int, str | None]:
         """상세 페이지에서 원본 이미지 + 비디오 + 조회수 추출 (브라우저 재사용)"""
         try:
             time.sleep(random.uniform(1.0, 2.0))
@@ -158,9 +159,10 @@ class FmKoreaCrawler(BaseCrawler):
                         images.append(src)
 
             videos = self._extract_videos(content) if content else []
-            return images[:50], videos, view_count
+            text_content = self._extract_text_content(content)
+            return images[:50], videos, view_count, text_content
         except Exception:
-            return [], [], 0
+            return [], [], 0, None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_"]

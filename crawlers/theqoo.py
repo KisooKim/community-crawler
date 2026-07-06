@@ -77,7 +77,7 @@ class TheqooCrawler(BaseCrawler):
         if time_td:
             published_at = self._parse_date(time_td.get_text(strip=True))
 
-        images, video_urls, like_count = self._get_article_detail(href)
+        images, video_urls, like_count, text_content = self._get_article_detail(href)
 
         return ArticleData(
             title=title,
@@ -88,9 +88,10 @@ class TheqooCrawler(BaseCrawler):
             like_count=like_count,
             comment_count=comment_count,
             published_at=published_at,
+            content=text_content,
         )
 
-    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int]:
+    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int, str | None]:
         """상세 페이지에서 이미지 + 비디오 추출 (더쿠는 추천수 미노출)"""
         try:
             soup = self.fetch_html(url)
@@ -106,9 +107,10 @@ class TheqooCrawler(BaseCrawler):
                         images.append(src)
 
             videos = self._extract_videos(content) if content else []
-            return images[:50], videos, 0
+            text_content = self._extract_text_content(content)
+            return images[:50], videos, 0, text_content
         except Exception:
-            return [], [], 0
+            return [], [], 0, None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_"]

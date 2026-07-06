@@ -312,6 +312,7 @@ class CrawlerService:
                 "like_count": article_data.like_count,
                 "comment_count": article_data.comment_count,
                 "published_at": article_data.published_at,
+                "content": article_data.content,
             },
             site.id,
         )

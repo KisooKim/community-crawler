@@ -102,7 +102,7 @@ class CoinpanCrawler:
         if date_cells:
             published_at = BaseCrawler._parse_date(date_cells[0].get_all_text(strip=True))
 
-        image_urls, video_urls = self._get_article_images(href)
+        image_urls, video_urls, text_content = self._get_article_images(href)
 
         return ArticleData(
             title=title,
@@ -113,20 +113,21 @@ class CoinpanCrawler:
             like_count=like_count,
             comment_count=comment_count,
             published_at=published_at,
+            content=text_content,
         )
 
-    def _get_article_images(self, url: str) -> tuple[list[str], list[str]]:
+    def _get_article_images(self, url: str) -> tuple[list[str], list[str], str | None]:
         try:
             time.sleep(random.uniform(1.0, 3.0))
             page = self.fetcher.get(url, stealthy_headers=True)
             if page.status != 200:
-                return [], []
+                return [], [], None
 
             content_els = page.css("div.read_body div.xe_content")
             if not content_els:
                 content_els = page.css("div.read_body")
             if not content_els:
-                return [], []
+                return [], [], None
 
             content = content_els[0]
             images = []
@@ -154,9 +155,18 @@ class CoinpanCrawler:
                         src = self.base_url + src
                     videos.append(src)
 
-            return images[:50], videos[:5]
+            # 텍스트 추출 (Scrapling API — BaseCrawler._extract_text_content 미사용)
+            text_content = None
+            try:
+                raw_text = content.get_all_text(separator="\n", strip=True)
+                if raw_text and len(raw_text) >= 5:
+                    text_content = raw_text[:2000]
+            except Exception:
+                pass
+
+            return images[:50], videos[:5], text_content
         except Exception:
-            return [], []
+            return [], [], None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank", "loading"]

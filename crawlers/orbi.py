@@ -73,7 +73,7 @@ class OrbiCrawler(BaseCrawler):
         if date_el:
             published_at = self._parse_date(date_el.get_text(strip=True))
 
-        images, video_urls, view_count = self._get_article_detail(href)
+        images, video_urls, view_count, text_content = self._get_article_detail(href)
 
         return ArticleData(
             title=title,
@@ -84,9 +84,10 @@ class OrbiCrawler(BaseCrawler):
             like_count=like_count,
             comment_count=comment_count,
             published_at=published_at,
+            content=text_content,
         )
 
-    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int]:
+    def _get_article_detail(self, url: str) -> tuple[list[str], list[str], int, str | None]:
         """상세 페이지에서 이미지 + 비디오 + 조회수 추출"""
         try:
             soup = self.fetch_html(url)
@@ -114,9 +115,10 @@ class OrbiCrawler(BaseCrawler):
                         images.append(src)
 
             videos = self._extract_videos(content) if content else []
-            return images[:50], videos, view_count
+            text_content = self._extract_text_content(content)
+            return images[:50], videos, view_count, text_content
         except Exception:
-            return [], [], 0
+            return [], [], 0, None
 
     def _is_valid_image(self, url: str) -> bool:
         exclude = ["emoticon", "icon", "btn_", "logo", "banner", "ad_", "blank",

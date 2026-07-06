@@ -99,6 +99,7 @@ class TrendService:
             like_count=article_data.get("like_count", 0),
             comment_count=article_data.get("comment_count", 0),
             published_at=article_data.get("published_at"),
+            content=article_data.get("content"),
         )
         self.db.add(article)
         return article
