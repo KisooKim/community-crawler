@@ -215,6 +215,7 @@ class BaseCrawler(ABC):
             return None
 
         from bs4 import NavigableString, Tag
+        from bs4.element import PreformattedString
         from copy import copy
         elem = copy(content_elem)
 
@@ -226,6 +227,10 @@ class BaseCrawler(ABC):
         parts = []
 
         def _walk(node):
+            # Comment/Doctype/CData 등은 NavigableString 서브클래스라 먼저 걸러야 한다
+            # (fmkorea의 <!--serverLog: fNN__LAZY__--> 주석이 본문에 섞여 들어왔음)
+            if isinstance(node, PreformattedString):
+                return
             if isinstance(node, NavigableString):
                 text = str(node).strip()
                 if text:
