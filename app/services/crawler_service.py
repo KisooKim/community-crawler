@@ -77,6 +77,10 @@ class CrawlerService:
     # 데이터센터 IP에서 차단되는 사이트 (self-hosted runner 전용)
     BLOCKED_SITES = {"fmkorea", "arcalive", "coinpan", "mlbpark", "slrclub"}
 
+    # 오래된 글 필터: published_at가 이 일수보다 과거이면 저장하지 않는다.
+    # 리스트 페이지가 아카이브 구간을 반환하는 사고(SLR클럽 hot_article)에 대한 안전망.
+    MAX_ARTICLE_AGE_DAYS = 7
+
     def __init__(self, db: Session = None):
         self.db = db
         self.trend_service = TrendService(db)
@@ -141,6 +145,20 @@ class CrawlerService:
                     seen_urls.add(a.url)
                     unique_articles.append(a)
             articles = unique_articles
+
+            # 오래된 글 필터링 (published_at가 있고 MAX_ARTICLE_AGE_DAYS 초과)
+            stale_cutoff = datetime.utcnow() - timedelta(days=self.MAX_ARTICLE_AGE_DAYS)
+            before_filter = len(articles)
+            articles = [
+                a for a in articles
+                if a.published_at is None or a.published_at >= stale_cutoff
+            ]
+            stale_count = before_filter - len(articles)
+            if stale_count:
+                logger.info(
+                    f"[{site_name}] Filtered {stale_count} stale articles "
+                    f"(>{self.MAX_ARTICLE_AGE_DAYS} days old)"
+                )
 
             # 1단계: 새 글만 이미지+비디오 다운로드 + pHash 병렬 처리
             # (DB 없이 순수 네트워크 작업)

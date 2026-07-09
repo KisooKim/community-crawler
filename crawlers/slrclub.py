@@ -9,6 +9,11 @@ from crawlers.base import BaseCrawler, ArticleData
 class SlrclubCrawler(BaseCrawler):
     """SLR클럽 크롤러 (Patchright 브라우저, self-hosted runner 전용)"""
 
+    # hot_article 게시판은 page 파라미터가 최신 목록의 페이지가 아니라
+    # 아카이브의 임의 구간을 반환한다 (page=1 → 2023년, page=2 → 2015년).
+    # 최신 목록은 page 파라미터가 없는 URL 하나뿐이므로 1페이지만 수집한다.
+    MAX_PAGES = 1
+
     @property
     def site_name(self) -> str:
         return "slrclub"
@@ -36,8 +41,9 @@ class SlrclubCrawler(BaseCrawler):
             # 1단계: 리스트 페이지에서 기본 정보 수집
             list_items = []
             for pg in range(1, self.MAX_PAGES + 1):
-                url = f"{self.base_url}/bbs/zboard.php?id=hot_article&page={pg}"
+                url = f"{self.base_url}/bbs/zboard.php?id=hot_article"
                 if pg > 1:
+                    url += f"&page={pg}"
                     time.sleep(random.uniform(2.0, 4.0))
                 page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 # JS가 테이블을 렌더링할 시간 대기
